@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kolls Autotronics | AI Vehicle Health Monitoring System</title>
+  
+  <!-- Google Fonts: JetBrains Mono & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons for High-Tech HUD Symbols -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Chart.js CDN for Real-Time Telemetry & Drift Analysis -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  
+  <!-- MQTT.js CDN for WebSocket Telemetry Streaming -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.5.0/mqtt.min.js"></script>
+  
+  <!-- Liquid Glass Futuristic Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Ambient Caustic & Nebula Lighting Layer -->
+  <div class="ambient-nebula-top"></div>
+  <div class="ambient-nebula-bottom"></div>
+  <div class="ambient-grid-overlay"></div>
+
+  <!-- Main Dashboard Container -->
+  <div class="dashboard-wrapper">
+
+    <!-- ================================================================= -->
+    <!-- HEADER BAR: BRANDING, STATUS, VEHICLE IDENTIFIER & TELEMETRY CONTROLS -->
+    <!-- ================================================================= -->
+    <header class="dashboard-header glass-panel">
+      <!-- Left: Brand Logo & Title -->
+      <div class="header-brand">
+        <div class="brand-logo-container">
+          <div class="brand-logo-glow"></div>
+          <div class="brand-icon">
+            <i class="fa-solid fa-microchip-vertical"></i>
+          </div>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title">
+            <span class="brand-accent">KOLLS</span> AUTOTRONICS
+          </div>
+          <div class="brand-subtitle">
+            <span class="ai-badge">AI-TELEMETRY</span>
+            <span>VEHICLE HEALTH MONITORING SYSTEM</span>
+            <span class="firmware-tag">v3.4.2</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Vehicle Telemetry ID & Active Health Status -->
+      <div class="header-vehicle-badge">
+        <div class="vehicle-id-pill">
+          <div class="vehicle-icon-wrap">
+            <i class="fa-solid fa-truck-monster"></i>
+          </div>
+          <div class="vehicle-info-block">
+            <span class="vehicle-label">TELEMETRY TARGET</span>
+            <span class="vehicle-id-text" id="vehicleIdDisplay">KA-TRUCK-001</span>
+          </div>
+          <div class="vehicle-status-pill" id="systemHealthBadge">
+            <span class="status-pulse-dot nominal" id="systemHealthDot"></span>
+            <span id="systemHealthText">SYSTEM NOMINAL</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: MQTT Connection Indicator, Mode Switch & Clock -->
+      <div class="header-controls">
+        <!-- MQTT Connection Status -->
+        <div class="connection-status-card" id="connectionStatusCard">
+          <span class="status-dot connecting" id="mqttStatusDot"></span>
+          <div class="connection-text-group">
+            <span class="conn-label">TELEMETRY LINK</span>
+            <span class="conn-state" id="mqttStatusText">CONNECTING...</span>
+          </div>
+        </div>
+
+        <!-- Mode Toggle Pill -->
+        <button class="mode-toggle-btn" id="modeToggleBtn" title="Toggle between Live MQTT and Autonomous Simulator">
+          <i class="fa-solid fa-satellite-dish" id="modeIcon"></i>
+          <span id="modeText">LIVE MQTT</span>
+        </button>
+
+        <!-- Sound Toggle -->
+        <button class="audio-toggle-btn" id="audioToggleBtn" title="Toggle Audio Synthesizer Beeps">
+          <i class="fa-solid fa-volume-xmark" id="audioIcon"></i>
+        </button>
+
+        <!-- Digital Telemetry Clock -->
+        <div class="digital-clock-panel">
+          <span class="clock-label">TELEMETRY UTC</span>
+          <span class="clock-time" id="digitalClock">--:--:--</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ================================================================= -->
+    <!-- QUICK METRIC RIBBON: HIGH-LEVEL STATS & SENSOR SUMMARY           -->
+    <!-- ================================================================= -->
+    <section class="metrics-ribbon">
+      <div class="ribbon-card glass-panel">
+        <div class="ribbon-icon cyan"><i class="fa-solid fa-gauge-high"></i></div>
+        <div class="ribbon-data">
+          <span class="ribbon-label">ENGINE SPEED</span>
+          <span class="ribbon-value" id="ribbonRpm">2,400 <span class="unit">RPM</span></span>
+        </div>
+        <div class="ribbon-trend positive" id="ribbonRpmZone">NORMAL</div>
+      </div>
+
+      <div class="ribbon-card glass-panel">
+        <div class="ribbon-icon blue"><i class="fa-solid fa-temperature-three-quarters"></i></div>
+        <div class="ribbon-data">
+          <span class="ribbon-label">COOLANT TEMP</span>
+          <span class="ribbon-value" id="ribbonCoolant">85 <span class="unit">°C</span></span>
+        </div>
+        <div class="ribbon-trend positive" id="ribbonCoolantStatus">OPTIMAL</div>
+      </div>
+
+      <div class="ribbon-card glass-panel">
+        <div class="ribbon-icon amber"><i class="fa-solid fa-oil-can"></i></div>
+        <div class="ribbon-data">
+          <span class="ribbon-label">OIL TEMP</span>
+          <span class="ribbon-value" id="ribbonOil">92 <span class="unit">°C</span></span>
+        </div>
+        <div class="ribbon-trend neutral" id="ribbonThermalDelta">ΔT +7°C</div>
+      </div>
+
+      <div class="ribbon-card glass-panel">
+        <div class="ribbon-icon green"><i class="fa-solid fa-car-battery"></i></div>
+        <div class="ribbon-data">
+          <span class="ribbon-label">ALTERNATOR BUS</span>
+          <span class="ribbon-value" id="ribbonVoltage">13.8 <span class="unit">V</span></span>
+        </div>
+        <div class="ribbon-trend positive">CHARGING</div>
+      </div>
+
+      <div class="ribbon-card glass-panel">
+        <div class="ribbon-icon purple"><i class="fa-solid fa-brain"></i></div>
+        <div class="ribbon-data">
+          <span class="ribbon-label">AI HEALTH INDEX</span>
+          <span class="ribbon-value" id="aiHealthIndex">98.8 <span class="unit">%</span></span>
+        </div>
+        <div class="ribbon-trend positive">0 ANOMALIES</div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- MAIN INTERACTIVE GRID: GAUGES, THERMAL, AI FUEL TRIM & LOGS       -->
+    <!-- ================================================================= -->
+    <main class="dashboard-grid">
+
+      <!-- =============================================================== -->
+      <!-- SECTION 1: CENTRAL DYNAMIC GAUGE CLUSTER                       -->
+      <!-- =============================================================== -->
+      <section class="grid-card central-cluster-card glass-panel">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-tachograph-digital"></i>
+            <span>POWERTRAIN DYNAMIC CLUSTER</span>
+          </div>
+          <div class="card-badge" id="powertrainModeBadge">CLOSED LOOP ACTIVE</div>
+        </div>
+
+        <div class="cluster-body">
+          
+          <!-- RPM Semi-Circular Gauge (Hero) -->
+          <div class="rpm-gauge-container">
+            <div class="rpm-gauge-wrapper">
+              <svg class="rpm-svg-gauge" viewBox="0 0 280 170" id="rpmSvg">
+                <defs>
+                  <!-- Base Track Glow Filter -->
+                  <filter id="gaugeGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                  
+                  <!-- Dynamic Progress Arc Gradients -->
+                  <linearGradient id="rpmGradientNominal" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#0088ff" />
+                    <stop offset="70%" stop-color="#00d4ff" />
+                    <stop offset="100%" stop-color="#00ff88" />
+                  </linearGradient>
+
+                  <linearGradient id="rpmGradientWarning" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#00d4ff" />
+                    <stop offset="60%" stop-color="#ffcc00" />
+                    <stop offset="100%" stop-color="#ff8800" />
+                  </linearGradient>
+
+                  <linearGradient id="rpmGradientDanger" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#ffcc00" />
+                    <stop offset="50%" stop-color="#ff3344" />
+                    <stop offset="100%" stop-color="#ff0055" />
+                  </linearGradient>
+
+                  <!-- Glass Sheen Linear Gradient -->
+                  <linearGradient id="glassSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="rgba(255,255,255,0.18)" />
+                    <stop offset="100%" stop-color="rgba(255,255,255,0)" />
+                  </linearGradient>
+                </defs>
+
+                <!-- Outer Decorative Glow Ring -->
+                <path d="M 25 145 A 115 115 0 0 1 255 145" class="gauge-outer-ring" />
+
+                <!-- Background Track (Semi-Circle Arc) -->
+                <path d="M 35 145 A 105 105 0 0 1 245 145" class="gauge-track-bg" />
+
+                <!-- Color Zone Indicator Segments -->
+                <path d="M 35 145 A 105 105 0 0 1 114 47" class="zone-arc zone-green" />
+                <path d="M 114 47 A 105 105 0 0 1 202 61" class="zone-arc zone-yellow" />
+                <path d="M 202 61 A 105 105 0 0 1 245 145" class="zone-arc zone-red" />
+
+                <!-- Animated Active Progress Arc -->
+                <path d="M 35 145 A 105 105 0 0 1 245 145" 
+                      class="gauge-progress-arc" 
+                      id="rpmProgressArc" 
+                      stroke="url(#rpmGradientNominal)" />
+
+                <!-- Gauge Ticks & Scale Numerals -->
+                <!-- 0 -->
+                <line x1="35" y1="145" x2="47" y2="145" class="gauge-tick major" />
+                <text x="52" y="148" class="gauge-tick-label">0</text>
+                <!-- 1 -->
+                <line x1="42" y1="113" x2="53" y2="117" class="gauge-tick minor" />
+                <!-- 2 -->
+                <line x1="62" y1="84" x2="71" y2="92" class="gauge-tick major" />
+                <text x="76" y="99" class="gauge-tick-label">2</text>
+                <!-- 3 -->
+                <line x1="91" y1="62" x2="98" y2="72" class="gauge-tick minor" />
+                <!-- 4 -->
+                <line x1="126" y1="48" x2="130" y2="60" class="gauge-tick major" />
+                <text x="135" y="72" class="gauge-tick-label">4</text>
+                <!-- 5 -->
+                <line x1="165" y1="46" x2="162" y2="58" class="gauge-tick minor" />
+                <!-- 6 (Redline entry) -->
+                <line x1="202" y1="61" x2="194" y2="71" class="gauge-tick major redline-tick" />
+                <text x="187" y="84" class="gauge-tick-label redline-label">6</text>
+                <!-- 7 -->
+                <line x1="230" y1="90" x2="219" y2="97" class="gauge-tick minor redline-tick" />
+                <!-- 8 -->
+                <line x1="245" y1="145" x2="233" y2="145" class="gauge-tick major redline-tick" />
+                <text x="221" y="148" class="gauge-tick-label redline-label">8</text>
+
+                <!-- Needle Indicator -->
+                <g id="rpmNeedleGroup" transform="rotate(-90 140 145)">
+                  <!-- Needle Glow Shadow -->
+                  <line x1="140" y1="145" x2="140" y2="35" class="gauge-needle-glow" />
+                  <!-- Needle Line -->
+                  <line x1="140" y1="145" x2="140" y2="38" class="gauge-needle" id="rpmNeedleLine" />
+                  <!-- Center Pivot Hub -->
+                  <circle cx="140" cy="145" r="14" class="gauge-needle-hub" />
+                  <circle cx="140" cy="145" r="6" class="gauge-needle-hub-inner" />
+                </g>
+              </svg>
+
+              <!-- Digital Readout Cluster In Center Of Gauge Arc -->
+              <div class="rpm-digital-center">
+                <span class="rpm-value-number" id="rpmValue">2,400</span>
+                <span class="rpm-unit-label">RPM &times; 1000</span>
+                <div class="rpm-zone-pill nominal" id="rpmZonePill">NOMINAL CRUISE</div>
+              </div>
+
+              <!-- Redline Flasher Indicator -->
+              <div class="rpm-redline-warning" id="rpmRedlineAlert">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>REDLINE OVER-REV</span>
+              </div>
+            </div>
+            
+            <div class="gauge-footer-stats">
+              <div class="footer-stat-item">
+                <span class="f-label">MAX RPM RECORDED</span>
+                <span class="f-val" id="maxRpmRecorded">3,850</span>
+              </div>
+              <div class="footer-stat-item">
+                <span class="f-label">IDLE BASELINE</span>
+                <span class="f-val">820 RPM</span>
+              </div>
+              <div class="footer-stat-item">
+                <span class="f-label">REDLINE LIMIT</span>
+                <span class="f-val redline-text">6,500 RPM</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vertical Bar Gauges Flanking/Paired with Central Cluster -->
+          <div class="vertical-gauges-cluster">
+
+            <!-- Engine Load Vertical Bar Gauge -->
+            <div class="vertical-gauge-card glass-subpanel">
+              <div class="v-gauge-header">
+                <span class="v-gauge-title">ENGINE LOAD</span>
+                <i class="fa-solid fa-weight-hanging v-icon"></i>
+              </div>
+
+              <div class="v-gauge-body">
+                <!-- Scale Marks -->
+                <div class="v-scale-labels">
+                  <span>100%</span>
+                  <span>75%</span>
+                  <span>50%</span>
+                  <span>25%</span>
+                  <span>0%</span>
+                </div>
+
+                <!-- Glass Tube Container -->
+                <div class="v-tube-container">
+                  <div class="v-tube-glow"></div>
+                  <!-- Liquid Fill Bar -->
+                  <div class="v-tube-fill load-gradient" id="engineLoadFill" style="height: 45%;">
+                    <div class="v-tube-meniscus"></div>
+                  </div>
+                  <!-- Grid Hash Lines on Tube -->
+                  <div class="v-tube-ticks"></div>
+                </div>
+              </div>
+
+              <div class="v-gauge-footer">
+                <div class="v-numeric-display">
+                  <span class="v-numeric-val" id="engineLoadValue">45</span>
+                  <span class="v-numeric-unit">%</span>
+                </div>
+                <span class="v-status-badge" id="loadStatusBadge">MODERATE LOAD</span>
+              </div>
+            </div>
+
+            <!-- Battery Voltage Vertical Bar Gauge -->
+            <div class="vertical-gauge-card glass-subpanel">
+              <div class="v-gauge-header">
+                <span class="v-gauge-title">BATTERY BUS</span>
+                <i class="fa-solid fa-bolt v-icon"></i>
+              </div>
+
+              <div class="v-gauge-body">
+                <!-- Scale Marks (10V - 15V) -->
+                <div class="v-scale-labels">
+                  <span>15.0V</span>
+                  <span>14.0V</span>
+                  <span>13.0V</span>
+                  <span>12.0V</span>
+                  <span>10.0V</span>
+                </div>
+
+                <!-- Glass Tube Container -->
+                <div class="v-tube-container">
+                  <div class="v-tube-glow"></div>
+                  <!-- Liquid Fill Bar (calibrated 10V-15V) -->
+                  <div class="v-tube-fill voltage-nominal" id="batteryVoltageFill" style="height: 76%;">
+                    <div class="v-tube-meniscus"></div>
+                  </div>
+                  <!-- Grid Hash Lines on Tube -->
+                  <div class="v-tube-ticks"></div>
+                </div>
+              </div>
+
+              <div class="v-gauge-footer">
+                <div class="v-numeric-display">
+                  <span class="v-numeric-val" id="batteryVoltageValue">13.8</span>
+                  <span class="v-numeric-unit">V</span>
+                </div>
+                <span class="v-status-badge positive" id="voltageStatusBadge">OPTIMAL 13.8V</span>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- SECTION 2: THERMAL CLUSTER & OIL VS COOLANT TREND CHART        -->
+      <!-- =============================================================== -->
+      <section class="grid-card thermal-cluster-card glass-panel">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-fire-burner"></i>
+            <span>THERMAL CLUSTER & HEAT DISSIPATION</span>
+          </div>
+          <div class="card-meta">
+            <span class="sensor-tag">THERMOSTAT DYNAMICS</span>
+          </div>
+        </div>
+
+        <div class="thermal-card-body">
+          <!-- Readouts Bar -->
+          <div class="thermal-kpis-grid">
+            <!-- Coolant Readout -->
+            <div class="thermal-kpi-item glass-subpanel" id="coolantKpiCard">
+              <div class="kpi-icon-row">
+                <i class="fa-solid fa-temperature-arrow-up"></i>
+                <span class="kpi-subtext">COOLANT SENSOR (ECT)</span>
+              </div>
+              <div class="kpi-number-row">
+                <span class="kpi-big-val nominal" id="coolantTempValue">85</span>
+                <span class="kpi-big-unit">°C</span>
+              </div>
+              <div class="kpi-zone-bar">
+                <div class="kpi-zone-fill" id="coolantZoneFill" style="width: 65%;"></div>
+              </div>
+              <div class="kpi-status-text" id="coolantStatusText">NOMINAL (80-95°C)</div>
+            </div>
+
+            <!-- Oil Readout -->
+            <div class="thermal-kpi-item glass-subpanel" id="oilKpiCard">
+              <div class="kpi-icon-row">
+                <i class="fa-solid fa-oil-can"></i>
+                <span class="kpi-subtext">ENGINE OIL (EOT)</span>
+              </div>
+              <div class="kpi-number-row">
+                <span class="kpi-big-val nominal" id="oilTempValue">92</span>
+                <span class="kpi-big-unit">°C</span>
+              </div>
+              <div class="kpi-zone-bar">
+                <div class="kpi-zone-fill amber" id="oilZoneFill" style="width: 72%;"></div>
+              </div>
+              <div class="kpi-status-text" id="oilStatusText">OPTIMAL VISCOSITY</div>
+            </div>
+
+            <!-- Intake Air Temp Readout -->
+            <div class="thermal-kpi-item glass-subpanel">
+              <div class="kpi-icon-row">
+                <i class="fa-solid fa-wind"></i>
+                <span class="kpi-subtext">INTAKE AIR (IAT)</span>
+              </div>
+              <div class="kpi-number-row">
+                <span class="kpi-big-val" id="intakeAirValue">35</span>
+                <span class="kpi-big-unit">°C</span>
+              </div>
+              <div class="kpi-zone-bar">
+                <div class="kpi-zone-fill cyan" style="width: 35%;"></div>
+              </div>
+              <div class="kpi-status-text">AMBIENT AIRFLOW NORMAL</div>
+            </div>
+          </div>
+
+          <!-- Oil vs Coolant Trend Chart Canvas -->
+          <div class="chart-container-wrap">
+            <div class="chart-sub-header">
+              <span class="chart-sub-title">OIL VS COOLANT TEMPERATURE DRIFT (LAST 30 CYCLES)</span>
+              <div class="chart-legend-custom">
+                <span class="legend-item"><span class="legend-dot coolant-dot"></span> Coolant (°C)</span>
+                <span class="legend-item"><span class="legend-dot oil-dot"></span> Oil (°C)</span>
+              </div>
+            </div>
+            <div class="chart-canvas-box">
+              <canvas id="thermalTrendChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- SECTION 3: AI TREND ANALYSIS (STFT & LTFT FUEL TRIM DRIFT)      -->
+      <!-- =============================================================== -->
+      <section class="grid-card ai-fuel-trim-card glass-panel">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-dna"></i>
+            <span>AI TREND ANALYSIS &bull; CLOSED-LOOP FUEL TRIM DRIFT</span>
+          </div>
+          <div class="ai-status-indicator">
+            <span class="ai-brain-pulse"></span>
+            <span class="ai-model-tag">NEURAL MODEL: LAMBDA-PREDICT v2.8</span>
+          </div>
+        </div>
+
+        <div class="ai-panel-body">
+          
+          <!-- AI Diagnostic Banner -->
+          <div class="ai-inference-card glass-subpanel" id="aiInferenceBox">
+            <div class="ai-inference-icon">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div class="ai-inference-content">
+              <div class="ai-inference-title">AI COMBUSTION INTEGRITY ASSESSMENT</div>
+              <div class="ai-inference-desc" id="aiInferenceText">
+                ECU closed-loop stoichiometric fuel correction stable. STFT (+2.3%) and LTFT (+4.1%) are well within &plusmn;10% manufacturer thresholds. No unmetered vacuum leak or injector clogging detected.
+              </div>
+            </div>
+            <div class="ai-metrics-tag">
+              <div class="ai-substat">
+                <span class="lbl">LAMBDA &lambda;</span>
+                <span class="val" id="lambdaValue">1.002</span>
+              </div>
+              <div class="ai-substat">
+                <span class="lbl">PREDICTIVE ANOMALY RISK</span>
+                <span class="val green" id="anomalyRiskVal">0.8%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dual Fuel Trim Chart Canvases -->
+          <div class="fuel-charts-grid">
+            
+            <!-- STFT Chart -->
+            <div class="fuel-chart-box glass-subpanel">
+              <div class="fuel-chart-header">
+                <div class="fuel-chart-title">
+                  <span>SHORT-TERM FUEL TRIM (STFT)</span>
+                  <span class="current-val" id="stftCurrentVal">+2.3%</span>
+                </div>
+                <span class="threshold-pill">&plusmn;10% THRESHOLD</span>
+              </div>
+              <div class="fuel-canvas-holder">
+                <canvas id="stftChart"></canvas>
+              </div>
+            </div>
+
+            <!-- LTFT Chart -->
+            <div class="fuel-chart-box glass-subpanel">
+              <div class="fuel-chart-header">
+                <div class="fuel-chart-title">
+                  <span>LONG-TERM FUEL TRIM (LTFT)</span>
+                  <span class="current-val" id="ltftCurrentVal">+4.1%</span>
+                </div>
+                <span class="threshold-pill warning-pill">&plusmn;10% DRIFT LIMIT</span>
+              </div>
+              <div class="fuel-canvas-holder">
+                <canvas id="ltftChart"></canvas>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- SECTION 4: ACTIVITY FEED & LIVE TELEMETRY LOG STREAM            -->
+      <!-- =============================================================== -->
+      <section class="grid-card activity-feed-card glass-panel">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-wave-square"></i>
+            <span>REAL-TIME DIAGNOSTIC ACTIVITY FEED & AI EVENT STREAM</span>
+          </div>
+          <div class="feed-controls">
+            <span class="entry-counter" id="logCountBadge">0 EVENTS</span>
+            <button class="feed-btn" id="clearLogBtn" title="Clear log container">
+              <i class="fa-solid fa-trash-can"></i> Clear
+            </button>
+            <button class="feed-btn" id="pauseScrollBtn" title="Toggle Auto Scroll">
+              <i class="fa-solid fa-angles-down" id="pauseScrollIcon"></i>
+              <span id="pauseScrollText">Auto-Scroll ON</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="feed-card-body">
+          <!-- Interactive Anomaly Simulation Toolbar (for Investor Pitch Live Demos) -->
+          <div class="demo-anomaly-toolbar">
+            <span class="toolbar-title"><i class="fa-solid fa-flask-vial"></i> DEMO INJECTORS:</span>
+            <button class="demo-btn revs-btn" id="injectRevBtn">
+              <i class="fa-solid fa-gauge"></i> Blip Throttle (5,800 RPM)
+            </button>
+            <button class="demo-btn lean-btn" id="injectLeanBtn">
+              <i class="fa-solid fa-triangle-exclamation"></i> Inject STFT Lean Spike (+14.8%)
+            </button>
+            <button class="demo-btn heat-btn" id="injectOverheatBtn">
+              <i class="fa-solid fa-fire"></i> Inject Coolant Overheat (108°C)
+            </button>
+            <button class="demo-btn batt-btn" id="injectBattSagBtn">
+              <i class="fa-solid fa-battery-quarter"></i> Voltage Sag (11.2V)
+            </button>
+            <button class="demo-btn nominal-btn" id="restoreNominalBtn">
+              <i class="fa-solid fa-rotate-right"></i> Reset Nominal
+            </button>
+          </div>
+
+          <!-- Scrolling Activity Feed List -->
+          <div class="activity-feed-scroll" id="activityFeed">
+            <!-- Dynamic Log Items are injected here via JS addLogEntry() -->
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ================================================================= -->
+    <!-- FOOTER: TELEMETRY METRICS, MQTT BROKER DETAILS & INVESTOR BADGE   -->
+    <!-- ================================================================= -->
+    <footer class="dashboard-footer glass-panel">
+      <div class="footer-left">
+        <span class="footer-indicator-dot"></span>
+        <span>BROKER: <strong id="footerBrokerAddress">broker.hivemq.com:8884/mqtt</strong></span>
+        <span class="divider">&bull;</span>
+        <span>TOPIC: <strong>kolls/vehicle/telemetry</strong></span>
+        <span class="divider">&bull;</span>
+        <span>INGESTION: <strong id="packetsReceivedCount">0</strong> pkts (<span id="ingestHzRate">0.0</span> Hz)</span>
+      </div>
+
+      <div class="footer-center">
+        <span>AI AUTONOMOUS HEALTH PLATFORM &bull; PROPRIETARY ALGORITHMS</span>
+      </div>
+
+      <div class="footer-right">
+        <span>KOLLS AUTOTRONICS CORP &copy; 2026. ALL RIGHTS RESERVED.</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

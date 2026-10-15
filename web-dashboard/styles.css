@@ -1,0 +1,1829 @@
+/* ==========================================================================
+   KOLLS AUTOTRONICS — AI VEHICLE HEALTH MONITORING SYSTEM
+   Liquid Glass / Futuristic Cockpit & Telemetry Theme
+   ========================================================================== */
+
+/* --- ROOT VARIABLES & COLOR PALETTE --- */
+:root {
+  /* Mandated Color Palette */
+  --deep-space: #0a0e1a;
+  --glass-bg: rgba(15, 25, 50, 0.65);
+  --glass-bg-subtle: rgba(13, 22, 44, 0.5);
+  --glass-bg-hover: rgba(22, 38, 75, 0.75);
+  --glass-border: rgba(0, 200, 255, 0.15);
+  --glass-border-bright: rgba(0, 212, 255, 0.45);
+  --glass-border-active: rgba(0, 255, 136, 0.5);
+  --cyan-glow: #00d4ff;
+  --cyan-glow-dim: rgba(0, 212, 255, 0.2);
+  --electric-blue: #0088ff;
+  --electric-blue-glow: rgba(0, 136, 255, 0.3);
+  --warning-yellow: #ffcc00;
+  --warning-yellow-glow: rgba(255, 204, 0, 0.35);
+  --danger-red: #ff3344;
+  --danger-red-glow: rgba(255, 51, 68, 0.45);
+  --nominal-green: #00ff88;
+  --nominal-green-glow: rgba(0, 255, 136, 0.35);
+  --purple-ai: #a855f7;
+  --purple-ai-glow: rgba(168, 85, 247, 0.35);
+
+  /* Typography Colors */
+  --text-primary: #f0f6fc;
+  --text-secondary: #9bb2d6;
+  --text-muted: #536b8e;
+  --text-cyan: #5ce1e6;
+
+  /* Typography Fonts */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Elevation & Glow Box Shadows */
+  --glass-shadow: 0 10px 32px 0 rgba(0, 0, 0, 0.55),
+                  inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+                  0 0 20px 0 rgba(0, 212, 255, 0.08);
+  --glow-shadow-cyan: 0 0 18px rgba(0, 212, 255, 0.35);
+  --glow-shadow-green: 0 0 18px rgba(0, 255, 136, 0.4);
+  --glow-shadow-red: 0 0 22px rgba(255, 51, 68, 0.5);
+
+  /* Layout Constants */
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+  --transition-smooth: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- GLOBAL RESET & BASE STYLES --- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--deep-space);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- AMBIENT CAUSTIC & RADIAL NEBULA LIGHTING --- */
+body {
+  position: relative;
+  background: 
+    radial-gradient(circle at 50% 0%, rgba(0, 212, 255, 0.09) 0%, transparent 60%),
+    radial-gradient(circle at 85% 30%, rgba(0, 136, 255, 0.07) 0%, transparent 50%),
+    radial-gradient(circle at 15% 75%, rgba(0, 255, 136, 0.04) 0%, transparent 45%),
+    radial-gradient(circle at 50% 100%, rgba(168, 85, 247, 0.05) 0%, transparent 55%),
+    var(--deep-space);
+  background-attachment: fixed;
+}
+
+/* Subtle Sci-Fi Grid Overlay */
+.ambient-grid-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+  background-image: 
+    linear-gradient(rgba(0, 200, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 200, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.8;
+}
+
+.ambient-nebula-top {
+  position: fixed;
+  top: -150px;
+  left: 30%;
+  width: 600px;
+  height: 300px;
+  background: radial-gradient(ellipse, rgba(0, 212, 255, 0.12) 0%, transparent 70%);
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+  animation: pulseNebula 12s ease-in-out infinite alternate;
+}
+
+.ambient-nebula-bottom {
+  position: fixed;
+  bottom: -150px;
+  right: 15%;
+  width: 500px;
+  height: 300px;
+  background: radial-gradient(ellipse, rgba(0, 136, 255, 0.09) 0%, transparent 70%);
+  filter: blur(70px);
+  pointer-events: none;
+  z-index: 0;
+  animation: pulseNebula 16s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes pulseNebula {
+  0% { transform: scale(0.9) translate(0, 0); opacity: 0.6; }
+  100% { transform: scale(1.15) translate(20px, -10px); opacity: 0.95; }
+}
+
+/* --- DASHBOARD WRAPPER & LAYOUT --- */
+.dashboard-wrapper {
+  position: relative;
+  z-index: 1;
+  max-width: 1720px;
+  margin: 0 auto;
+  padding: 16px 20px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ==========================================================================
+   LIQUID GLASS CARDS & PANELS (MANDATED THEME)
+   ========================================================================== */
+.glass-panel {
+  position: relative;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+  transition: var(--transition-smooth);
+  overflow: hidden;
+}
+
+/* Ambient Caustic Top Sheen & Light Refraction (Mandated) */
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.6), transparent);
+  pointer-events: none;
+  opacity: 0.7;
+  transition: opacity 0.3s;
+}
+
+.glass-panel:hover {
+  border-color: rgba(0, 200, 255, 0.28);
+  box-shadow: 0 12px 38px 0 rgba(0, 0, 0, 0.6),
+              inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+              0 0 24px 0 rgba(0, 212, 255, 0.14);
+}
+
+.glass-subpanel {
+  position: relative;
+  background: var(--glass-bg-subtle);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 200, 255, 0.1);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.3);
+  transition: var(--transition-smooth);
+}
+
+.glass-subpanel:hover {
+  border-color: rgba(0, 200, 255, 0.22);
+  background: var(--glass-bg-hover);
+}
+
+/* ==========================================================================
+   HEADER SECTION: BRANDING & TELEMETRY CONTROLS
+   ========================================================================== */
+.dashboard-header {
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-logo-container {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-logo-glow {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--cyan-glow), var(--electric-blue));
+  filter: blur(10px);
+  opacity: 0.6;
+  animation: logoPulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes logoPulse {
+  0% { transform: scale(0.9); opacity: 0.45; }
+  100% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.brand-icon {
+  position: relative;
+  z-index: 2;
+  width: 42px;
+  height: 42px;
+  background: rgba(10, 20, 42, 0.85);
+  border: 1px solid var(--cyan-glow);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cyan-glow);
+  font-size: 20px;
+  box-shadow: inset 0 0 10px rgba(0, 212, 255, 0.3);
+}
+
+.brand-title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #ffffff;
+}
+
+.brand-accent {
+  color: var(--cyan-glow);
+  text-shadow: 0 0 12px rgba(0, 212, 255, 0.6);
+}
+
+.brand-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  letter-spacing: 0.8px;
+  margin-top: 2px;
+}
+
+.ai-badge {
+  background: rgba(168, 85, 247, 0.2);
+  color: #d8b4fe;
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.5px;
+}
+
+.firmware-tag {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+/* Vehicle ID Badge (Center Header) */
+.header-vehicle-badge {
+  display: flex;
+  align-items: center;
+}
+
+.vehicle-id-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(12, 22, 45, 0.7);
+  border: 1px solid rgba(0, 200, 255, 0.22);
+  border-radius: 30px;
+  padding: 6px 14px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.4);
+}
+
+.vehicle-icon-wrap {
+  width: 28px;
+  height: 28px;
+  background: rgba(0, 212, 255, 0.12);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cyan-glow);
+  font-size: 13px;
+}
+
+.vehicle-info-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.vehicle-label {
+  font-size: 8.5px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.vehicle-id-text {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 1px;
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+}
+
+.vehicle-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 255, 136, 0.12);
+  border: 1px solid rgba(0, 255, 136, 0.35);
+  border-radius: 12px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--nominal-green);
+}
+
+.status-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--nominal-green);
+  box-shadow: 0 0 8px var(--nominal-green);
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+.status-pulse-dot.warning {
+  background: var(--warning-yellow);
+  box-shadow: 0 0 8px var(--warning-yellow);
+}
+
+.status-pulse-dot.danger {
+  background: var(--danger-red);
+  box-shadow: 0 0 8px var(--danger-red);
+}
+
+/* Header Controls & Telemetry Link */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.connection-status-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(10, 18, 36, 0.7);
+  border: 1px solid rgba(0, 200, 255, 0.18);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+}
+
+/* Pulsing Status Dot (Mandated CSS Animation) */
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  transition: all 0.3s;
+}
+
+.status-dot.connected {
+  background: var(--nominal-green);
+  animation: pulseGlowGreen 1.8s infinite;
+}
+
+.status-dot.connecting {
+  background: var(--warning-yellow);
+  animation: pulseGlowYellow 1.2s infinite;
+}
+
+.status-dot.simulation {
+  background: var(--cyan-glow);
+  animation: pulseGlowCyan 2.2s infinite;
+}
+
+.status-dot.disconnected {
+  background: var(--danger-red);
+  animation: pulseGlowRed 1s infinite;
+}
+
+@keyframes pulseGlowGreen {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.75); }
+  70% { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(0, 255, 136, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+}
+
+@keyframes pulseGlowYellow {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 204, 0, 0.75); }
+  70% { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(255, 204, 0, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 204, 0, 0); }
+}
+
+@keyframes pulseGlowCyan {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.75); }
+  70% { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(0, 212, 255, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 212, 255, 0); }
+}
+
+@keyframes pulseGlowRed {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 51, 68, 0.85); }
+  70% { transform: scale(1.2); box-shadow: 0 0 0 9px rgba(255, 51, 68, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 51, 68, 0); }
+}
+
+.connection-text-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.conn-label {
+  font-size: 8px;
+  color: var(--text-muted);
+  letter-spacing: 0.8px;
+}
+
+.conn-state {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+/* Mode Switch Button */
+.mode-toggle-btn {
+  background: rgba(0, 136, 255, 0.15);
+  border: 1px solid rgba(0, 136, 255, 0.35);
+  color: var(--cyan-glow);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transition: var(--transition-smooth);
+}
+
+.mode-toggle-btn:hover {
+  background: rgba(0, 212, 255, 0.25);
+  border-color: var(--cyan-glow);
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.mode-toggle-btn.simulating {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.5);
+  color: #d8b4fe;
+}
+
+/* Audio Toggle Button */
+.audio-toggle-btn {
+  background: rgba(15, 25, 50, 0.8);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: var(--transition-smooth);
+}
+
+.audio-toggle-btn:hover {
+  color: var(--cyan-glow);
+  border-color: var(--cyan-glow);
+}
+
+.audio-toggle-btn.active {
+  color: var(--nominal-green);
+  border-color: var(--nominal-green);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+}
+
+/* Digital Clock */
+.digital-clock-panel {
+  display: flex;
+  flex-direction: column;
+  background: rgba(9, 16, 32, 0.6);
+  border: 1px solid rgba(0, 200, 255, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  text-align: right;
+}
+
+.clock-label {
+  font-size: 8px;
+  color: var(--text-muted);
+}
+
+.clock-time {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 1px;
+}
+
+/* ==========================================================================
+   METRIC RIBBONS: 5 STAT CARDS
+   ========================================================================== */
+.metrics-ribbon {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.ribbon-card {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ribbon-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.ribbon-icon.cyan {
+  background: rgba(0, 212, 255, 0.12);
+  color: var(--cyan-glow);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+}
+
+.ribbon-icon.blue {
+  background: rgba(0, 136, 255, 0.12);
+  color: var(--electric-blue);
+  border: 1px solid rgba(0, 136, 255, 0.3);
+}
+
+.ribbon-icon.amber {
+  background: rgba(255, 204, 0, 0.12);
+  color: var(--warning-yellow);
+  border: 1px solid rgba(255, 204, 0, 0.3);
+}
+
+.ribbon-icon.green {
+  background: rgba(0, 255, 136, 0.12);
+  color: var(--nominal-green);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.ribbon-icon.purple {
+  background: rgba(168, 85, 247, 0.14);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.ribbon-data {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.ribbon-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 0.8px;
+}
+
+.ribbon-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.ribbon-value .unit {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.ribbon-trend {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 4px;
+}
+
+.ribbon-trend.positive {
+  background: rgba(0, 255, 136, 0.12);
+  color: var(--nominal-green);
+  border: 1px solid rgba(0, 255, 136, 0.28);
+}
+
+.ribbon-trend.warning {
+  background: rgba(255, 204, 0, 0.15);
+  color: var(--warning-yellow);
+  border: 1px solid rgba(255, 204, 0, 0.35);
+}
+
+.ribbon-trend.danger {
+  background: rgba(255, 51, 68, 0.15);
+  color: var(--danger-red);
+  border: 1px solid rgba(255, 51, 68, 0.35);
+}
+
+.ribbon-trend.neutral {
+  background: rgba(0, 212, 255, 0.1);
+  color: var(--cyan-glow);
+  border: 1px solid rgba(0, 212, 255, 0.22);
+}
+
+/* ==========================================================================
+   MAIN DASHBOARD GRID LAYOUT
+   ========================================================================== */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Card Headers */
+.grid-card {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(0, 200, 255, 0.1);
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #ffffff;
+}
+
+.card-title i {
+  color: var(--cyan-glow);
+  font-size: 14px;
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+}
+
+.card-badge {
+  background: rgba(0, 212, 255, 0.12);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  color: var(--cyan-glow);
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.sensor-tag {
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  background: rgba(15, 25, 50, 0.7);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 200, 255, 0.1);
+}
+
+/* ==========================================================================
+   SECTION 1: CENTRAL DYNAMIC GAUGE CLUSTER (RPM & VERTICALS)
+   ========================================================================== */
+.central-cluster-card .cluster-body {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 20px;
+  align-items: center;
+}
+
+/* RPM Semi-Circular Gauge (Hero Component) */
+.rpm-gauge-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.rpm-gauge-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rpm-svg-gauge {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5));
+}
+
+/* Gauge SVG Components */
+.gauge-outer-ring {
+  fill: none;
+  stroke: rgba(0, 200, 255, 0.08);
+  stroke-width: 2;
+  stroke-dasharray: 4 6;
+}
+
+.gauge-track-bg {
+  fill: none;
+  stroke: rgba(10, 20, 42, 0.85);
+  stroke-width: 18;
+  stroke-linecap: round;
+}
+
+.zone-arc {
+  fill: none;
+  stroke-width: 3;
+  opacity: 0.35;
+}
+
+.zone-green {
+  stroke: var(--nominal-green);
+}
+
+.zone-yellow {
+  stroke: var(--warning-yellow);
+}
+
+.zone-red {
+  stroke: var(--danger-red);
+}
+
+/* Active Progress Arc */
+.gauge-progress-arc {
+  fill: none;
+  stroke-width: 16;
+  stroke-linecap: round;
+  /* Circumference of semi-circle: pi * r = 3.14159 * 105 ~ 329.87 */
+  stroke-dasharray: 330;
+  stroke-dashoffset: 330;
+  transition: stroke-dashoffset 0.22s cubic-bezier(0.2, 0, 0.2, 1),
+              stroke 0.3s ease;
+  filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.5));
+}
+
+.gauge-tick {
+  stroke: rgba(136, 160, 197, 0.4);
+  stroke-width: 1.5;
+}
+
+.gauge-tick.major {
+  stroke: rgba(0, 212, 255, 0.8);
+  stroke-width: 2.2;
+}
+
+.gauge-tick.minor {
+  stroke: rgba(136, 160, 197, 0.25);
+  stroke-width: 1.2;
+}
+
+.gauge-tick-label {
+  fill: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.redline-tick {
+  stroke: var(--danger-red) !important;
+}
+
+.redline-label {
+  fill: var(--danger-red) !important;
+}
+
+/* Gauge Needle Indicator */
+#rpmNeedleGroup {
+  transform-origin: 140px 145px;
+  transition: transform 0.22s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.gauge-needle {
+  stroke: #ffffff;
+  stroke-width: 3;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px var(--cyan-glow));
+}
+
+.gauge-needle-glow {
+  stroke: var(--cyan-glow);
+  stroke-width: 6;
+  opacity: 0.6;
+  stroke-linecap: round;
+}
+
+.gauge-needle-hub {
+  fill: #0c162d;
+  stroke: var(--cyan-glow);
+  stroke-width: 2.5;
+  box-shadow: 0 0 10px var(--cyan-glow);
+}
+
+.gauge-needle-hub-inner {
+  fill: var(--cyan-glow);
+}
+
+/* Digital Readout In Center of RPM Arc */
+.rpm-digital-center {
+  position: absolute;
+  bottom: 0px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.rpm-value-number {
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 0 16px rgba(0, 212, 255, 0.6);
+  letter-spacing: -1px;
+}
+
+.rpm-unit-label {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  margin-top: 3px;
+}
+
+.rpm-zone-pill {
+  margin-top: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.8px;
+  transition: var(--transition-smooth);
+}
+
+.rpm-zone-pill.nominal {
+  background: rgba(0, 255, 136, 0.14);
+  color: var(--nominal-green);
+  border: 1px solid rgba(0, 255, 136, 0.4);
+}
+
+.rpm-zone-pill.warning {
+  background: rgba(255, 204, 0, 0.18);
+  color: var(--warning-yellow);
+  border: 1px solid rgba(255, 204, 0, 0.45);
+}
+
+.rpm-zone-pill.danger {
+  background: rgba(255, 51, 68, 0.22);
+  color: var(--danger-red);
+  border: 1px solid rgba(255, 51, 68, 0.55);
+}
+
+/* Redline Flasher Banner */
+.rpm-redline-warning {
+  position: absolute;
+  top: 10px;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 51, 68, 0.25);
+  border: 1px solid var(--danger-red);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  box-shadow: 0 0 16px rgba(255, 51, 68, 0.6);
+  animation: redlineBlink 0.4s infinite alternate;
+}
+
+@keyframes redlineBlink {
+  0% { opacity: 0.7; transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1.02); }
+}
+
+.gauge-footer-stats {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 200, 255, 0.1);
+}
+
+.footer-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.f-label {
+  font-size: 8px;
+  color: var(--text-muted);
+}
+
+.f-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.f-val.redline-text {
+  color: var(--danger-red);
+}
+
+/* ==========================================================================
+   VERTICAL GAUGES: ENGINE LOAD & BATTERY VOLTAGE
+   ========================================================================== */
+.vertical-gauges-cluster {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  height: 100%;
+}
+
+.vertical-gauge-card {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.v-gauge-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.v-gauge-title {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.8px;
+}
+
+.v-icon {
+  font-size: 11px;
+  color: var(--cyan-glow);
+}
+
+.v-gauge-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 150px;
+  width: 100%;
+}
+
+.v-scale-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  font-size: 8px;
+  color: var(--text-muted);
+  text-align: right;
+  line-height: 1;
+}
+
+/* Liquid Glass Cylinder Tube */
+.v-tube-container {
+  position: relative;
+  width: 28px;
+  height: 100%;
+  background: rgba(8, 14, 28, 0.85);
+  border: 1px solid rgba(0, 200, 255, 0.22);
+  border-radius: 14px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8),
+              0 0 10px rgba(0, 212, 255, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 3px;
+}
+
+.v-tube-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,0.08) 0%, transparent 40%, rgba(255,255,255,0.04) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Tick markings across the tube */
+.v-tube-ticks {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 14px,
+    rgba(0, 200, 255, 0.2) 14px,
+    rgba(0, 200, 255, 0.2) 15px
+  );
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Liquid Fill Bar with Meniscus */
+.v-tube-fill {
+  position: relative;
+  width: 100%;
+  border-radius: 10px;
+  transition: height 0.35s cubic-bezier(0.3, 0, 0.2, 1),
+              background 0.35s ease;
+  box-shadow: 0 0 12px currentColor;
+  z-index: 1;
+}
+
+.v-tube-meniscus {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  filter: drop-shadow(0 0 6px #ffffff);
+}
+
+/* Gradients for Fill */
+.load-gradient {
+  background: linear-gradient(to top, var(--electric-blue), var(--cyan-glow));
+  color: var(--cyan-glow);
+}
+
+.load-gradient.warning {
+  background: linear-gradient(to top, var(--cyan-glow), var(--warning-yellow));
+  color: var(--warning-yellow);
+}
+
+.load-gradient.danger {
+  background: linear-gradient(to top, var(--warning-yellow), var(--danger-red));
+  color: var(--danger-red);
+}
+
+.voltage-nominal {
+  background: linear-gradient(to top, #0088ff, var(--nominal-green));
+  color: var(--nominal-green);
+}
+
+.voltage-warning {
+  background: linear-gradient(to top, var(--nominal-green), var(--warning-yellow));
+  color: var(--warning-yellow);
+}
+
+.voltage-danger {
+  background: linear-gradient(to top, var(--warning-yellow), var(--danger-red));
+  color: var(--danger-red);
+}
+
+.v-gauge-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.v-numeric-display {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.v-numeric-val {
+  font-size: 19px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.v-numeric-unit {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.v-status-badge {
+  font-size: 8px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 212, 255, 0.1);
+  color: var(--cyan-glow);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  margin-top: 3px;
+  text-align: center;
+}
+
+.v-status-badge.positive {
+  background: rgba(0, 255, 136, 0.12);
+  color: var(--nominal-green);
+  border-color: rgba(0, 255, 136, 0.3);
+}
+
+.v-status-badge.warning {
+  background: rgba(255, 204, 0, 0.14);
+  color: var(--warning-yellow);
+  border-color: rgba(255, 204, 0, 0.35);
+}
+
+.v-status-badge.danger {
+  background: rgba(255, 51, 68, 0.18);
+  color: var(--danger-red);
+  border-color: rgba(255, 51, 68, 0.4);
+}
+
+/* ==========================================================================
+   SECTION 2: THERMAL CLUSTER & CHARTS
+   ========================================================================== */
+.thermal-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.thermal-kpis-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.thermal-kpi-item {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.kpi-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.kpi-subtext {
+  font-size: 8.5px;
+  letter-spacing: 0.6px;
+}
+
+.kpi-number-row {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  margin: 4px 0 6px 0;
+}
+
+.kpi-big-val {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.kpi-big-val.nominal {
+  color: var(--nominal-green);
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+}
+
+.kpi-big-val.warning {
+  color: var(--warning-yellow);
+  text-shadow: 0 0 10px rgba(255, 204, 0, 0.4);
+}
+
+.kpi-big-val.danger {
+  color: var(--danger-red);
+  text-shadow: 0 0 12px rgba(255, 51, 68, 0.6);
+}
+
+.kpi-big-unit {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.kpi-zone-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(10, 20, 40, 0.8);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+
+.kpi-zone-fill {
+  height: 100%;
+  background: var(--nominal-green);
+  transition: width 0.35s ease, background 0.35s ease;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.kpi-zone-fill.amber {
+  background: var(--warning-yellow);
+}
+
+.kpi-zone-fill.cyan {
+  background: var(--cyan-glow);
+}
+
+.kpi-zone-fill.danger {
+  background: var(--danger-red);
+}
+
+.kpi-status-text {
+  font-size: 8px;
+  color: var(--text-secondary);
+}
+
+/* Chart Canvas Wrapper */
+.chart-container-wrap {
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 18, 36, 0.5);
+  border: 1px solid rgba(0, 200, 255, 0.12);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
+
+.chart-sub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.chart-sub-title {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.8px;
+  font-weight: 600;
+}
+
+.chart-legend-custom {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 9px;
+  color: var(--text-secondary);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.coolant-dot {
+  background: var(--cyan-glow);
+  box-shadow: 0 0 6px var(--cyan-glow);
+}
+
+.oil-dot {
+  background: #ffaa00;
+  box-shadow: 0 0 6px #ffaa00;
+}
+
+.chart-canvas-box {
+  position: relative;
+  width: 100%;
+  height: 140px;
+}
+
+/* ==========================================================================
+   SECTION 3: AI FUEL TRIM & DRIFT ANALYSIS PANEL
+   ========================================================================== */
+.ai-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-brain-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--purple-ai);
+  box-shadow: 0 0 10px var(--purple-ai);
+  animation: brainPulse 2s infinite ease-in-out;
+}
+
+@keyframes brainPulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.6; }
+}
+
+.ai-model-tag {
+  font-size: 9px;
+  color: #d8b4fe;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.ai-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* AI Diagnostic Inference Card */
+.ai-inference-card {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-left: 3px solid var(--purple-ai);
+}
+
+.ai-inference-icon {
+  font-size: 22px;
+  color: var(--purple-ai);
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+}
+
+.ai-inference-content {
+  flex-grow: 1;
+}
+
+.ai-inference-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.6px;
+  margin-bottom: 2px;
+}
+
+.ai-inference-desc {
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.ai-metrics-tag {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+  background: rgba(10, 18, 36, 0.6);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.ai-substat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8.5px;
+}
+
+.ai-substat .lbl {
+  color: var(--text-muted);
+}
+
+.ai-substat .val {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.ai-substat .val.green {
+  color: var(--nominal-green);
+}
+
+.ai-substat .val.warning {
+  color: var(--warning-yellow);
+}
+
+/* Dual Fuel Trim Charts */
+.fuel-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.fuel-chart-box {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.fuel-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.fuel-chart-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.fuel-chart-title .current-val {
+  font-size: 11px;
+  color: var(--cyan-glow);
+  font-weight: 700;
+}
+
+.threshold-pill {
+  font-size: 8px;
+  color: var(--text-muted);
+  background: rgba(0, 200, 255, 0.08);
+  border: 1px solid rgba(0, 200, 255, 0.18);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.threshold-pill.warning-pill {
+  color: var(--warning-yellow);
+  background: rgba(255, 204, 0, 0.1);
+  border-color: rgba(255, 204, 0, 0.3);
+}
+
+.fuel-canvas-holder {
+  position: relative;
+  width: 100%;
+  height: 120px;
+}
+
+/* ==========================================================================
+   SECTION 4: ACTIVITY FEED & ANOMALY INJECTORS
+   ========================================================================== */
+.activity-feed-card {
+  grid-column: span 2;
+}
+
+.feed-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.entry-counter {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--cyan-glow);
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.feed-btn {
+  background: rgba(15, 25, 50, 0.8);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: var(--transition-smooth);
+}
+
+.feed-btn:hover {
+  background: rgba(0, 200, 255, 0.15);
+  color: var(--cyan-glow);
+  border-color: var(--cyan-glow);
+}
+
+/* Anomaly Injector Toolbar (Pitch Presentation Live Controls) */
+.demo-anomaly-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(9, 16, 32, 0.7);
+  border: 1px solid rgba(0, 200, 255, 0.14);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.toolbar-title {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.demo-btn {
+  background: rgba(18, 30, 58, 0.7);
+  border: 1px solid rgba(0, 200, 255, 0.2);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition-smooth);
+}
+
+.demo-btn:hover {
+  transform: translateY(-1px);
+}
+
+.demo-btn.revs-btn:hover {
+  background: rgba(0, 212, 255, 0.25);
+  border-color: var(--cyan-glow);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
+}
+
+.demo-btn.lean-btn:hover {
+  background: rgba(255, 204, 0, 0.22);
+  border-color: var(--warning-yellow);
+  box-shadow: 0 0 10px rgba(255, 204, 0, 0.4);
+}
+
+.demo-btn.heat-btn:hover {
+  background: rgba(255, 51, 68, 0.25);
+  border-color: var(--danger-red);
+  box-shadow: 0 0 10px rgba(255, 51, 68, 0.4);
+}
+
+.demo-btn.batt-btn:hover {
+  background: rgba(255, 136, 0, 0.22);
+  border-color: #ff8800;
+  box-shadow: 0 0 10px rgba(255, 136, 0, 0.4);
+}
+
+.demo-btn.nominal-btn:hover {
+  background: rgba(0, 255, 136, 0.22);
+  border-color: var(--nominal-green);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+}
+
+/* Activity Feed Scrolling Container */
+.activity-feed-scroll {
+  height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 4px;
+}
+
+/* Custom Futuristic Scrollbar */
+.activity-feed-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.activity-feed-scroll::-webkit-scrollbar-track {
+  background: rgba(10, 18, 36, 0.5);
+  border-radius: 3px;
+}
+
+.activity-feed-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 200, 255, 0.25);
+  border-radius: 3px;
+}
+
+.activity-feed-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--cyan-glow);
+  box-shadow: 0 0 8px var(--cyan-glow);
+}
+
+/* Log Item Styling with Left-Border Color Coding (Mandated) */
+.log-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(12, 22, 44, 0.55);
+  border: 1px solid rgba(0, 200, 255, 0.08);
+  border-left: 3.5px solid var(--nominal-green);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 10px;
+  animation: logSlideIn 0.25s ease-out;
+  transition: var(--transition-smooth);
+}
+
+@keyframes logSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.log-entry:hover {
+  background: rgba(18, 32, 64, 0.75);
+  border-color: rgba(0, 200, 255, 0.25);
+}
+
+/* Severity Border Colors */
+.log-entry.nominal {
+  border-left-color: var(--nominal-green);
+}
+
+.log-entry.advisory {
+  border-left-color: var(--warning-yellow);
+}
+
+.log-entry.anomaly {
+  border-left-color: #ff8800;
+}
+
+.log-entry.critical {
+  border-left-color: var(--danger-red);
+}
+
+.log-entry.system {
+  border-left-color: var(--cyan-glow);
+}
+
+.log-timestamp {
+  color: var(--text-cyan);
+  font-weight: 600;
+  font-size: 9.5px;
+  min-width: 65px;
+}
+
+.log-badge {
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+  min-width: 72px;
+  text-align: center;
+}
+
+.log-badge.nominal {
+  background: rgba(0, 255, 136, 0.15);
+  color: var(--nominal-green);
+}
+
+.log-badge.advisory {
+  background: rgba(255, 204, 0, 0.15);
+  color: var(--warning-yellow);
+}
+
+.log-badge.anomaly {
+  background: rgba(255, 136, 0, 0.2);
+  color: #ffaa33;
+}
+
+.log-badge.critical {
+  background: rgba(255, 51, 68, 0.2);
+  color: var(--danger-red);
+}
+
+.log-badge.system {
+  background: rgba(0, 212, 255, 0.15);
+  color: var(--cyan-glow);
+}
+
+.log-message {
+  color: var(--text-primary);
+  flex-grow: 1;
+  word-break: break-word;
+}
+
+/* ==========================================================================
+   FOOTER SECTION: BROKER DETAILS & INGESTION METRICS
+   ========================================================================== */
+.dashboard-footer {
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9.5px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyan-glow);
+  box-shadow: 0 0 6px var(--cyan-glow);
+}
+
+.footer-left strong {
+  color: var(--text-secondary);
+}
+
+.divider {
+  color: rgba(0, 200, 255, 0.3);
+}
+
+.footer-center {
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+}
+
+.footer-right {
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN & DISPLAY ADAPTATIONS
+   ========================================================================== */
+@media (max-width: 1280px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .activity-feed-card {
+    grid-column: span 1;
+  }
+  
+  .metrics-ribbon {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .metrics-ribbon {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .central-cluster-card .cluster-body {
+    grid-template-columns: 1fr;
+  }
+
+  .fuel-charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .thermal-kpis-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

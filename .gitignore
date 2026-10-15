@@ -1,0 +1,20 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts
+*.o
+*.elf
+*.bin
+*.hex
+build/
+
+# Secrets (never commit WiFi credentials)
+secrets.h
