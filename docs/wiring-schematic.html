@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    .wire { stroke-width: 2.5; fill: none; }
+    .wire-power { stroke: #ef4444; }
+    .wire-gnd { stroke: #111827; stroke-dasharray: 6,3; }
+    .wire-can-h { stroke: #f59e0b; }
+    .wire-can-l { stroke: #3b82f6; }
+    .wire-spi { stroke: #8b5cf6; }
+    .wire-data { stroke: #10b981; }
+    .component {
+      rx: 8; ry: 8;
+      stroke-width: 2;
+    }
+    .pin-label { font-size: 10px; font-family: monospace; }
+    .comp-label { font-size: 13px; font-weight: 700; font-family: system-ui; }
+    .sub-label { font-size: 10px; font-family: monospace; fill: var(--muted-foreground, #6b7280); }
+    .pin-dot { r: 4; }
+    .legend-line { stroke-width: 3; }
+    text { fill: var(--foreground, #e5e7eb); }
+    .component { fill: var(--card, #1e293b); stroke: var(--border, #334155); }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-4">
+
+  <!-- Title -->
+  <div class="text-center mb-4">
+    <h1 class="text-xl font-bold">⚡ Kolls Autotronics — Complete Wiring Schematic</h1>
+    <p class="text-sm text-[var(--muted-foreground)]">ESP32 + SN65HVD230 CAN + 1.8" TFT + LM2596 Power + OBD-II</p>
+  </div>
+
+  <!-- Main Schematic SVG -->
+  <svg viewBox="0 0 920 620" class="w-full max-w-5xl mx-auto" xmlns="http://www.w3.org/2000/svg">
+
+    <!-- ================= OBD-II CONNECTOR (Left) ================= -->
+    <rect class="component" x="20" y="180" width="140" height="200" stroke="#f59e0b"/>
+    <text class="comp-label" x="90" y="205" text-anchor="middle" fill="#f59e0b">OBD-II</text>
+    <text class="sub-label" x="90" y="220" text-anchor="middle">16-Pin Male Plug</text>
+    <!-- Pin labels -->
+    <text class="pin-label" x="35" y="255" fill="#ef4444">Pin 16 → +12V/24V</text>
+    <text class="pin-label" x="35" y="275" fill="#6b7280">Pin 4  → Chassis GND</text>
+    <text class="pin-label" x="35" y="295" fill="#6b7280">Pin 5  → Signal GND</text>
+    <text class="pin-label" x="35" y="320" fill="#f59e0b">Pin 6  → CAN High</text>
+    <text class="pin-label" x="35" y="340" fill="#3b82f6">Pin 14 → CAN Low</text>
+    <!-- Pin dots -->
+    <circle class="pin-dot" cx="160" cy="250" fill="#ef4444"/>
+    <circle class="pin-dot" cx="160" cy="270" fill="#6b7280"/>
+    <circle class="pin-dot" cx="160" cy="290" fill="#6b7280"/>
+    <circle class="pin-dot" cx="160" cy="316" fill="#f59e0b"/>
+    <circle class="pin-dot" cx="160" cy="336" fill="#3b82f6"/>
+
+    <!-- ================= INLINE 5A FUSE ================= -->
+    <rect class="component" x="200" y="220" width="100" height="60" stroke="#ef4444"/>
+    <text class="comp-label" x="250" y="248" text-anchor="middle" fill="#ef4444">5A FUSE</text>
+    <text class="sub-label" x="250" y="265" text-anchor="middle">Inline Protection</text>
+    <!-- Wires: OBD Pin16 → Fuse IN -->
+    <line class="wire wire-power" x1="160" y1="250" x2="200" y2="250"/>
+    <!-- Fuse OUT → LM2596 -->
+    <line class="wire wire-power" x1="300" y1="250" x2="340" y2="250"/>
+
+    <!-- ================= LM2596 STEP-DOWN ================= -->
+    <rect class="component" x="340" y="200" width="140" height="100" stroke="#ef4444"/>
+    <text class="comp-label" x="410" y="230" text-anchor="middle" fill="#ef4444">LM2596</text>
+    <text class="sub-label" x="410" y="248" text-anchor="middle">DC-DC Step Down</text>
+    <text class="sub-label" x="410" y="263" text-anchor="middle">12V/24V → 5V/3.3V</text>
+    <!-- Pin labels -->
+    <text class="pin-label" x="350" y="290" fill="#ef4444">VIN+</text>
+    <text class="pin-label" x="430" y="290" fill="#10b981">VOUT+ (3.3V)</text>
+    <!-- Output wires to ESP32 power -->
+    <line class="wire wire-data" x1="480" y1="260" x2="520" y2="260"/>
+    <line class="wire wire-data" x1="520" y1="260" x2="520" y2="200"/>
+    <line class="wire wire-data" x1="520" y1="200" x2="560" y2="200"/>
+
+    <!-- GND from OBD → LM2596 & common -->
+    <line class="wire wire-gnd" x1="160" y1="270" x2="180" y2="270"/>
+    <line class="wire wire-gnd" x1="180" y1="270" x2="180" y2="380"/>
+    <line class="wire wire-gnd" x1="180" y1="380" x2="680" y2="380"/>
+
+    <!-- ================= SN65HVD230 CAN TRANSCEIVER ================= -->
+    <rect class="component" x="220" y="400" width="150" height="120" stroke="#f59e0b"/>
+    <text class="comp-label" x="295" y="425" text-anchor="middle" fill="#f59e0b">SN65HVD230</text>
+    <text class="sub-label" x="295" y="442" text-anchor="middle">CAN Bus Transceiver</text>
+    <text class="sub-label" x="295" y="457" text-anchor="middle">3.3V Logic Level</text>
+    <!-- Left pins (vehicle side) -->
+    <text class="pin-label" x="230" y="480" fill="#f59e0b">CANH</text>
+    <text class="pin-label" x="230" y="500" fill="#3b82f6">CANL</text>
+    <circle class="pin-dot" cx="220" cy="476" fill="#f59e0b"/>
+    <circle class="pin-dot" cx="220" cy="496" fill="#3b82f6"/>
+    <!-- Right pins (ESP32 side) -->
+    <text class="pin-label" x="330" y="480" fill="#10b981">TX → GPIO 5</text>
+    <text class="pin-label" x="330" y="500" fill="#10b981">RX → GPIO 4</text>
+    <circle class="pin-dot" cx="370" cy="476" fill="#10b981"/>
+    <circle class="pin-dot" cx="370" cy="496" fill="#10b981"/>
+    <!-- VCC & GND labels -->
+    <text class="pin-label" x="265" y="517" fill="#10b981">VCC → 3.3V</text>
+
+    <!-- CAN wires from OBD -->
+    <line class="wire wire-can-h" x1="160" y1="316" x2="190" y2="316"/>
+    <line class="wire wire-can-h" x1="190" y1="316" x2="190" y2="476"/>
+    <line class="wire wire-can-h" x1="190" y1="476" x2="220" y2="476"/>
+
+    <line class="wire wire-can-l" x1="160" y1="336" x2="200" y2="336"/>
+    <line class="wire wire-can-l" x1="200" y1="336" x2="200" y2="496"/>
+    <line class="wire wire-can-l" x1="200" y1="496" x2="220" y2="496"/>
+
+    <!-- CAN TX/RX wires to ESP32 -->
+    <line class="wire wire-data" x1="370" y1="476" x2="560" y2="476"/>
+    <line class="wire wire-data" x1="560" y1="476" x2="560" y2="330"/>
+
+    <line class="wire wire-data" x1="370" y1="496" x2="540" y2="496"/>
+    <line class="wire wire-data" x1="540" y1="496" x2="540" y2="345"/>
+    <line class="wire wire-data" x1="540" y1="345" x2="560" y2="345"/>
+
+    <!-- ================= ESP32 (Center) ================= -->
+    <rect class="component" x="560" y="160" width="160" height="240" stroke="#10b981" stroke-width="3"/>
+    <text class="comp-label" x="640" y="188" text-anchor="middle" fill="#10b981">ESP32</text>
+    <text class="sub-label" x="640" y="205" text-anchor="middle">WROOM-32 Dev Board</text>
+
+    <!-- Left-side pins -->
+    <text class="pin-label" x="570" y="230" fill="#10b981">3V3 ←</text>
+    <text class="pin-label" x="570" y="250" fill="#6b7280">GND ←</text>
+    <text class="pin-label" x="570" y="280" fill="#8b5cf6">GPIO 23 (MOSI)</text>
+    <text class="pin-label" x="570" y="300" fill="#8b5cf6">GPIO 18 (SCLK)</text>
+    <text class="pin-label" x="570" y="330" fill="#10b981">GPIO 5 (CAN TX)</text>
+    <text class="pin-label" x="570" y="345" fill="#10b981">GPIO 4 (CAN RX)</text>
+    <text class="pin-label" x="570" y="375" fill="#f59e0b">GPIO 25 (LED)</text>
+
+    <!-- Right-side pins -->
+    <text class="pin-label" x="660" y="230" fill="#8b5cf6">GPIO 15 (TFT CS)</text>
+    <text class="pin-label" x="660" y="250" fill="#8b5cf6">GPIO 16 (TFT RST)</text>
+    <text class="pin-label" x="660" y="270" fill="#8b5cf6">GPIO 2 (TFT DC)</text>
+
+    <!-- Pin dots on right side -->
+    <circle class="pin-dot" cx="720" cy="226" fill="#8b5cf6"/>
+    <circle class="pin-dot" cx="720" cy="246" fill="#8b5cf6"/>
+    <circle class="pin-dot" cx="720" cy="266" fill="#8b5cf6"/>
+
+    <!-- WiFi antenna icon -->
+    <text x="640" y="395" text-anchor="middle" font-size="11" fill="#3b82f6">📡 WiFi → MQTT Broker</text>
+
+    <!-- ================= 1.8" TFT DISPLAY (Right) ================= -->
+    <rect class="component" x="770" y="160" width="130" height="180" stroke="#8b5cf6"/>
+    <text class="comp-label" x="835" y="188" text-anchor="middle" fill="#8b5cf6">1.8" TFT</text>
+    <text class="sub-label" x="835" y="205" text-anchor="middle">ST7735 128×160</text>
+    <text class="sub-label" x="835" y="220" text-anchor="middle">SPI Interface</text>
+    <!-- Pin labels -->
+    <text class="pin-label" x="780" y="248" fill="#8b5cf6">CS  ← GPIO 15</text>
+    <text class="pin-label" x="780" y="268" fill="#8b5cf6">RST ← GPIO 16</text>
+    <text class="pin-label" x="780" y="288" fill="#8b5cf6">DC  ← GPIO 2</text>
+    <text class="pin-label" x="780" y="308" fill="#8b5cf6">SDA ← GPIO 23</text>
+    <text class="pin-label" x="780" y="328" fill="#8b5cf6">SCK ← GPIO 18</text>
+    <circle class="pin-dot" cx="770" cy="244" fill="#8b5cf6"/>
+    <circle class="pin-dot" cx="770" cy="264" fill="#8b5cf6"/>
+    <circle class="pin-dot" cx="770" cy="284" fill="#8b5cf6"/>
+    <circle class="pin-dot" cx="770" cy="304" fill="#8b5cf6"/>
+    <circle class="pin-dot" cx="770" cy="324" fill="#8b5cf6"/>
+
+    <!-- SPI wires: ESP32 right pins → TFT left pins -->
+    <line class="wire wire-spi" x1="720" y1="226" x2="770" y2="244"/>
+    <line class="wire wire-spi" x1="720" y1="246" x2="770" y2="264"/>
+    <line class="wire wire-spi" x1="720" y1="266" x2="770" y2="284"/>
+    <!-- MOSI and SCLK go around -->
+    <line class="wire wire-spi" x1="555" y1="276" x2="545" y2="276"/>
+    <line class="wire wire-spi" x1="545" y1="276" x2="545" y2="140"/>
+    <line class="wire wire-spi" x1="545" y1="140" x2="760" y2="140"/>
+    <line class="wire wire-spi" x1="760" y1="140" x2="760" y2="304"/>
+    <line class="wire wire-spi" x1="760" y1="304" x2="770" y2="304"/>
+
+    <line class="wire wire-spi" x1="555" y1="296" x2="535" y2="296"/>
+    <line class="wire wire-spi" x1="535" y1="296" x2="535" y2="130"/>
+    <line class="wire wire-spi" x1="535" y1="130" x2="750" y2="130"/>
+    <line class="wire wire-spi" x1="750" y1="130" x2="750" y2="324"/>
+    <line class="wire wire-spi" x1="750" y1="324" x2="770" y2="324"/>
+
+    <!-- ================= 18650 BATTERY BACKUP ================= -->
+    <rect class="component" x="600" y="440" width="120" height="70" stroke="#22c55e"/>
+    <text class="comp-label" x="660" y="468" text-anchor="middle" fill="#22c55e">18650</text>
+    <text class="sub-label" x="660" y="485" text-anchor="middle">Battery Backup</text>
+    <text class="sub-label" x="660" y="500" text-anchor="middle">Anti-Tamper Power</text>
+    <!-- Wire from battery to ESP32 VIN -->
+    <line class="wire" x1="660" y1="440" x2="660" y2="410" stroke="#22c55e" stroke-width="2.5"/>
+    <line class="wire" x1="660" y1="410" x2="640" y2="410" stroke="#22c55e" stroke-width="2.5"/>
+    <line class="wire" x1="640" y1="400" x2="640" y2="410" stroke="#22c55e" stroke-width="2.5" stroke-dasharray="4,3"/>
+
+    <!-- ================= STATUS LED ================= -->
+    <rect class="component" x="770" y="370" width="100" height="50" stroke="#f59e0b"/>
+    <text class="comp-label" x="820" y="392" text-anchor="middle" fill="#f59e0b">LED</text>
+    <text class="sub-label" x="820" y="409" text-anchor="middle">+ 220Ω Resistor</text>
+    <!-- Wire from ESP32 GPIO 25 to LED -->
+    <line class="wire" x1="720" y1="371" x2="770" y2="386" stroke="#f59e0b" stroke-width="2"/>
+
+    <!-- GND bus bar line -->
+    <line class="wire wire-gnd" x1="180" y1="380" x2="180" y2="560"/>
+    <line class="wire wire-gnd" x1="180" y1="560" x2="850" y2="560"/>
+    <text class="pin-label" x="500" y="575" text-anchor="middle" fill="#6b7280">━━━━ COMMON GROUND BUS ━━━━</text>
+    <!-- GND taps -->
+    <line class="wire wire-gnd" x1="295" y1="520" x2="295" y2="560"/>
+    <line class="wire wire-gnd" x1="640" y1="400" x2="640" y2="560"/>
+    <line class="wire wire-gnd" x1="835" y1="340" x2="835" y2="560"/>
+    <line class="wire wire-gnd" x1="820" y1="420" x2="820" y2="560"/>
+
+    <!-- ================= LEGEND ================= -->
+    <rect x="20" y="20" width="880" height="55" rx="8" fill="var(--card, #1e293b)" stroke="var(--border, #334155)" opacity="0.9"/>
+    <text class="comp-label" x="40" y="42" fill="var(--foreground)">WIRE LEGEND:</text>
+
+    <line class="legend-line wire-power" x1="180" y1="38" x2="220" y2="38"/>
+    <text class="pin-label" x="225" y="42" fill="#ef4444">+12V/24V Power</text>
+
+    <line class="legend-line wire-gnd" x1="340" y1="38" x2="380" y2="38"/>
+    <text class="pin-label" x="385" y="42" fill="#6b7280">Ground (GND)</text>
+
+    <line class="legend-line wire-can-h" x1="490" y1="38" x2="530" y2="38"/>
+    <text class="pin-label" x="535" y="42" fill="#f59e0b">CAN High</text>
+
+    <line class="legend-line wire-can-l" x1="610" y1="38" x2="650" y2="38"/>
+    <text class="pin-label" x="655" y="42" fill="#3b82f6">CAN Low</text>
+
+    <line class="legend-line wire-spi" x1="720" y1="38" x2="760" y2="38"/>
+    <text class="pin-label" x="765" y="42" fill="#8b5cf6">SPI Bus</text>
+
+    <line class="legend-line wire-data" x1="830" y1="38" x2="870" y2="38"/>
+    <text class="pin-label" x="875" y="42" fill="#10b981">Data/3.3V</text>
+
+    <!-- Sub-legend row -->
+    <text class="pin-label" x="40" y="62" fill="var(--muted-foreground)">Signal Path: OBD-II → Fuse → LM2596 (Power) | OBD-II → SN65HVD230 (CAN Data) | ESP32 → TFT (SPI) | ESP32 → WiFi → MQTT → Web Dashboard</text>
+
+  </svg>
+
+  <!-- ================= PIN-BY-PIN WIRING TABLE ================= -->
+  <div class="mt-6 bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 overflow-x-auto">
+    <h2 class="text-lg font-bold mb-3">📋 Pin-by-Pin Wiring Table</h2>
+
+    <table class="w-full text-sm font-mono">
+      <thead>
+        <tr class="border-b border-[var(--border)]">
+          <th class="text-left py-2 px-3 text-[var(--muted-foreground)]">FROM</th>
+          <th class="text-left py-2 px-3 text-[var(--muted-foreground)]">WIRE</th>
+          <th class="text-left py-2 px-3 text-[var(--muted-foreground)]">TO</th>
+          <th class="text-left py-2 px-3 text-[var(--muted-foreground)]">NOTES</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- POWER -->
+        <tr class="border-b border-[var(--border)] border-opacity-30"><td colspan="4" class="py-2 px-3 font-bold text-red-400">🔴 POWER CIRCUIT</td></tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">OBD-II Pin 16</td>
+          <td class="py-1.5 px-3 text-red-400">RED wire</td>
+          <td class="py-1.5 px-3">5A Fuse IN</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">+12V (car) or +24V (truck)</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">5A Fuse OUT</td>
+          <td class="py-1.5 px-3 text-red-400">RED wire</td>
+          <td class="py-1.5 px-3">LM2596 VIN+</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Fuse protects everything downstream</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">LM2596 VOUT+</td>
+          <td class="py-1.5 px-3 text-green-400">GREEN wire</td>
+          <td class="py-1.5 px-3">ESP32 3V3 pin</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">⚠️ Adjust LM2596 potentiometer to 3.3V BEFORE connecting!</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">LM2596 VOUT+</td>
+          <td class="py-1.5 px-3 text-green-400">GREEN wire</td>
+          <td class="py-1.5 px-3">SN65HVD230 VCC</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">3.3V power to CAN transceiver</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">LM2596 VOUT+</td>
+          <td class="py-1.5 px-3 text-green-400">GREEN wire</td>
+          <td class="py-1.5 px-3">TFT VCC pin</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">3.3V power to TFT display</td>
+        </tr>
+
+        <!-- GROUND -->
+        <tr class="border-b border-[var(--border)] border-opacity-30"><td colspan="4" class="py-2 px-3 font-bold text-gray-400">⚫ GROUND (COMMON BUS)</td></tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">OBD-II Pin 4/5</td>
+          <td class="py-1.5 px-3 text-gray-400">BLACK wire</td>
+          <td class="py-1.5 px-3">LM2596 VIN−</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Vehicle chassis ground</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">LM2596 VOUT−</td>
+          <td class="py-1.5 px-3 text-gray-400">BLACK wire</td>
+          <td class="py-1.5 px-3">ESP32 GND</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Shared ground bus</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">ESP32 GND</td>
+          <td class="py-1.5 px-3 text-gray-400">BLACK wire</td>
+          <td class="py-1.5 px-3">SN65HVD230 GND</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Common ground</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">ESP32 GND</td>
+          <td class="py-1.5 px-3 text-gray-400">BLACK wire</td>
+          <td class="py-1.5 px-3">TFT GND pin</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Common ground</td>
+        </tr>
+
+        <!-- CAN BUS -->
+        <tr class="border-b border-[var(--border)] border-opacity-30"><td colspan="4" class="py-2 px-3 font-bold text-amber-400">🟡 CAN BUS (Vehicle Data)</td></tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">OBD-II Pin 6</td>
+          <td class="py-1.5 px-3 text-amber-400">YELLOW wire</td>
+          <td class="py-1.5 px-3">SN65HVD230 CANH</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">CAN High differential signal</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">OBD-II Pin 14</td>
+          <td class="py-1.5 px-3 text-blue-400">BLUE wire</td>
+          <td class="py-1.5 px-3">SN65HVD230 CANL</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">CAN Low differential signal</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">SN65HVD230 TX</td>
+          <td class="py-1.5 px-3 text-green-400">GREEN wire</td>
+          <td class="py-1.5 px-3">ESP32 GPIO 5</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">CAN transmit (ESP32 TWAI TX)</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">SN65HVD230 RX</td>
+          <td class="py-1.5 px-3 text-green-400">GREEN wire</td>
+          <td class="py-1.5 px-3">ESP32 GPIO 4</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">CAN receive (ESP32 TWAI RX)</td>
+        </tr>
+
+        <!-- SPI / TFT -->
+        <tr class="border-b border-[var(--border)] border-opacity-30"><td colspan="4" class="py-2 px-3 font-bold text-purple-400">🟣 TFT DISPLAY (SPI Bus)</td></tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">ESP32 GPIO 15</td>
+          <td class="py-1.5 px-3 text-purple-400">PURPLE wire</td>
+          <td class="py-1.5 px-3">TFT CS</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Chip Select</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">ESP32 GPIO 16</td>
+          <td class="py-1.5 px-3 text-purple-400">PURPLE wire</td>
+          <td class="py-1.5 px-3">TFT RST</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Reset</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">ESP32 GPIO 2</td>
+          <td class="py-1.5 px-3 text-purple-400">PURPLE wire</td>
+          <td class="py-1.5 px-3">TFT DC (A0)</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Data/Command select</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">ESP32 GPIO 23</td>
+          <td class="py-1.5 px-3 text-purple-400">PURPLE wire</td>
+          <td class="py-1.5 px-3">TFT SDA (MOSI)</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">SPI data out</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">ESP32 GPIO 18</td>
+          <td class="py-1.5 px-3 text-purple-400">PURPLE wire</td>
+          <td class="py-1.5 px-3">TFT SCK (CLK)</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">SPI clock</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">TFT LED/BLK</td>
+          <td class="py-1.5 px-3 text-green-400">—</td>
+          <td class="py-1.5 px-3">3.3V (via 100Ω)</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Backlight (always on). Some modules have no resistor needed.</td>
+        </tr>
+
+        <!-- LED -->
+        <tr class="border-b border-[var(--border)] border-opacity-30"><td colspan="4" class="py-2 px-3 font-bold text-amber-300">💡 STATUS LED</td></tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">ESP32 GPIO 25</td>
+          <td class="py-1.5 px-3 text-amber-300">wire</td>
+          <td class="py-1.5 px-3">220Ω Resistor → LED Anode (+)</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Green=CAN OK, Blue=Sync, Red=Fault</td>
+        </tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">LED Cathode (−)</td>
+          <td class="py-1.5 px-3 text-gray-400">BLACK</td>
+          <td class="py-1.5 px-3">GND</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Common ground</td>
+        </tr>
+
+        <!-- BATTERY -->
+        <tr class="border-b border-[var(--border)] border-opacity-30"><td colspan="4" class="py-2 px-3 font-bold text-green-400">🔋 BATTERY BACKUP</td></tr>
+        <tr class="border-b border-[var(--border)] border-opacity-20">
+          <td class="py-1.5 px-3">18650 Battery +</td>
+          <td class="py-1.5 px-3 text-red-400">RED</td>
+          <td class="py-1.5 px-3">ESP32 VIN (via Schottky diode)</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Diode prevents backfeed from LM2596</td>
+        </tr>
+        <tr>
+          <td class="py-1.5 px-3">18650 Battery −</td>
+          <td class="py-1.5 px-3 text-gray-400">BLACK</td>
+          <td class="py-1.5 px-3">GND bus</td>
+          <td class="py-1.5 px-3 text-[var(--muted-foreground)]">Common ground</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ================= CRITICAL WARNINGS ================= -->
+  <div class="mt-4 bg-red-950 bg-opacity-40 border border-red-700 rounded-xl p-4">
+    <h3 class="font-bold text-red-400 mb-2">⚠️ CRITICAL: Before Powering On</h3>
+    <ol class="list-decimal list-inside text-sm space-y-1.5 text-[var(--foreground)]">
+      <li><strong>Adjust LM2596 FIRST:</strong> Connect 12V to LM2596 input. Turn the potentiometer screw with a screwdriver while measuring output with a multimeter. Set to exactly <strong>3.3V</strong> before connecting anything else.</li>
+      <li><strong>Double-check GND:</strong> ALL components must share the same ground bus. A floating ground will cause random crashes or CAN read failures.</li>
+      <li><strong>CAN wiring:</strong> CANH (yellow) and CANL (blue) must NOT be swapped. Verify OBD-II Pin 6 = CANH, Pin 14 = CANL.</li>
+      <li><strong>No 5V to ESP32 GPIO:</strong> The SN65HVD230 must run on 3.3V. If you use a 5V version, you'll fry the ESP32 GPIO pins.</li>
+      <li><strong>Battery diode:</strong> Place a Schottky diode (e.g. 1N5819) on the 18650 positive wire with the stripe facing the ESP32 — this prevents the main power from charging the battery.</li>
+    </ol>
+  </div>
+
+</body>
+</html>

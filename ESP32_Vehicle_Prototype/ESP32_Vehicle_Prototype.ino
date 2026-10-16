@@ -168,6 +168,33 @@ String   lastDrawnStatus    = "";
 bool     lastDrawnMqttState = false;
 
 // ==============================================================================================
+//                           OBD-II ACTIVE REQUEST CONFIGURATION
+// ==============================================================================================
+// The OBD-II protocol is REQUEST-RESPONSE. The ECU will NOT send data on its own.
+// We must actively transmit a request frame (CAN ID 0x7DF, Mode 01 + PID) for each
+// parameter we want, then listen for the ECU's response on CAN IDs 0x7E8-0x7EF.
+// We cycle through all 7 PIDs, sending one request every 100ms (10 requests/sec).
+// This gives us a full telemetry refresh approximately every 700ms.
+// ----------------------------------------------------------------------------------------------
+
+// PIDs to query in sequence (Mode 01 - Show Current Data)
+const uint8_t OBD_REQUEST_PIDS[] = {
+  0x0C,  // Engine RPM
+  0x05,  // Coolant Temperature
+  0x04,  // Calculated Engine Load
+  0x0F,  // Intake Air Temperature
+  0x42,  // Control Module Voltage (System/Battery Voltage)
+  0x06,  // Short-Term Fuel Trim (Bank 1)
+  0x07   // Long-Term Fuel Trim (Bank 1)
+};
+const uint8_t OBD_PID_COUNT = sizeof(OBD_REQUEST_PIDS) / sizeof(OBD_REQUEST_PIDS[0]);
+
+// OBD-II Request Timing
+const unsigned long OBD_REQUEST_INTERVAL_MS = 100;  // 100ms between each PID request
+unsigned long lastOBDRequestTime = 0;
+uint8_t       currentPIDIndex    = 0;  // Cycles 0 through OBD_PID_COUNT-1
+
+// ==============================================================================================
 //                                   FORWARD DECLARATIONS
 // ==============================================================================================
 void setupHardware();
@@ -175,6 +202,8 @@ void connectWiFi();
 bool connectMQTT();
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void initCANBus();
+void sendOBDRequest(uint8_t pid);
+void cycleOBDRequests();
 void readCANBus();
 void simulateCANData();
 void evaluateSystemHealth();
@@ -288,7 +317,12 @@ void loop() {
     mqttConnected = false;
   }
 
-  // 3. Poll Real CAN Bus or Execute Simulation Engine
+  // 3. Send OBD-II PID Requests (Active Polling)
+  // OBD-II is request-response: we must ASK the ECU for each sensor reading.
+  // This cycles through RPM, Coolant, Load, IAT, Voltage, STFT, LTFT at 100ms intervals.
+  cycleOBDRequests();
+
+  // 4. Poll Real CAN Bus for ECU Responses
   readCANBus();
 
   // If no hardware CAN messages have arrived within timeout, switch to simulated feed
@@ -372,6 +406,65 @@ void initCANBus() {
   } else {
     Serial.printf("[CAN] ERROR: Failed to install TWAI driver (Code: 0x%X). Using Simulator.\n", installErr);
     canDriverInstalled = false;
+  }
+}
+
+/**
+ * @brief Sends an OBD-II Mode 01 PID request to the vehicle ECU.
+ * Transmits a standard 8-byte CAN frame to broadcast address 0x7DF.
+ * The ECU will respond on CAN ID 0x7E8 (or 0x7E8-0x7EF for multi-ECU vehicles).
+ *
+ * OBD-II Request Frame Format:
+ *   Byte 0: Number of additional data bytes (always 0x02 for Mode 01 single PID)
+ *   Byte 1: Mode (0x01 = Show Current Data)
+ *   Byte 2: PID number to request
+ *   Bytes 3-7: Padding (0x00 or 0x55 per ISO 15765-4)
+ *
+ * @param pid The OBD-II PID to request (e.g., 0x0C for RPM, 0x05 for Coolant Temp)
+ */
+void sendOBDRequest(uint8_t pid) {
+  if (!canDriverInstalled) return;
+
+  twai_message_t txMessage;
+  txMessage.identifier   = 0x7DF;    // OBD-II broadcast request address
+  txMessage.extd         = 0;        // Standard 11-bit identifier (not extended 29-bit)
+  txMessage.rtr          = 0;        // Data frame (not Remote Transmission Request)
+  txMessage.data_length_code = 8;    // Always 8 bytes per ISO 15765-4
+
+  // Build the OBD-II request payload
+  txMessage.data[0] = 0x02;  // Number of additional data bytes following
+  txMessage.data[1] = 0x01;  // Mode 01: Show Current Data
+  txMessage.data[2] = pid;   // The specific PID we're requesting
+  txMessage.data[3] = 0x00;  // Padding
+  txMessage.data[4] = 0x00;  // Padding
+  txMessage.data[5] = 0x00;  // Padding
+  txMessage.data[6] = 0x00;  // Padding
+  txMessage.data[7] = 0x00;  // Padding
+
+  // Transmit with 10ms timeout (non-blocking for real-time loop)
+  esp_err_t result = twai_transmit(&txMessage, pdMS_TO_TICKS(10));
+  if (result != ESP_OK) {
+    Serial.printf("[CAN] OBD-II request failed for PID 0x%02X (err: 0x%X)\n", pid, result);
+  }
+}
+
+/**
+ * @brief Cycles through all configured OBD-II PIDs, sending one request every 100ms.
+ * This ensures we don't flood the CAN bus while still getting fresh data for all parameters.
+ * Full cycle through 7 PIDs takes ~700ms → approx 1.4 full refreshes per 2-second publish interval.
+ */
+void cycleOBDRequests() {
+  if (!canDriverInstalled) return;
+
+  unsigned long now = millis();
+  if (now - lastOBDRequestTime >= OBD_REQUEST_INTERVAL_MS) {
+    lastOBDRequestTime = now;
+
+    // Send request for the current PID in the rotation
+    sendOBDRequest(OBD_REQUEST_PIDS[currentPIDIndex]);
+
+    // Advance to next PID (wrap around)
+    currentPIDIndex = (currentPIDIndex + 1) % OBD_PID_COUNT;
   }
 }
 
