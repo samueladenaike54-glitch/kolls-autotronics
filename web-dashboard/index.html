@@ -3,613 +3,1482 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kolls Autotronics | AI Vehicle Health Monitoring System</title>
+  <title>Kolls Autotronics — Fleet Command & Driver Intelligence</title>
   
-  <!-- Google Fonts: JetBrains Mono & Inter -->
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20width=%22100%22%20height=%22100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
-  
-  <!-- FontAwesome Icons for High-Tech HUD Symbols -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome 6 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  
-  <!-- Chart.js CDN for Real-Time Telemetry & Drift Analysis -->
+
+  <!-- Leaflet CSS (Geospatial Map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- Chart.js 4.4.2 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-  
-  <!-- MQTT.js CDN for WebSocket Telemetry Streaming -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.5.0/mqtt.min.js"></script>
-  
-  <!-- Liquid Glass Futuristic Stylesheet -->
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Custom Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <!-- Ambient Caustic & Nebula Lighting Layer -->
-  <div class="ambient-nebula-top"></div>
-  <div class="ambient-nebula-bottom"></div>
-  <div class="ambient-grid-overlay"></div>
+<body class="theme-dark">
 
-  <!-- Main Dashboard Container -->
-  <div class="dashboard-wrapper">
+  <!-- ========================================================================= -->
+  <!-- SCREEN 1: UNIFIED AUTHENTICATION / ROLE SELECTOR                          -->
+  <!-- ========================================================================= -->
+  <div id="login-screen" class="view-screen active-screen">
+    <div class="login-backdrop">
+      <div class="login-grid-lines"></div>
+      <div class="login-glow-orb-1"></div>
+      <div class="login-glow-orb-2"></div>
+    </div>
 
-    <!-- ================================================================= -->
-    <!-- HEADER BAR: BRANDING, STATUS, VEHICLE IDENTIFIER & TELEMETRY CONTROLS -->
-    <!-- ================================================================= -->
-    <header class="dashboard-header glass-panel">
-      <!-- Left: Brand Logo & Title -->
-      <div class="header-brand">
-        <div class="brand-logo-container">
-          <div class="brand-logo-glow"></div>
-          <div class="brand-icon">
-            <i class="fa-solid fa-microchip-vertical"></i>
-          </div>
+    <div class="login-container">
+      <div class="login-brand">
+        <div class="brand-logo-icon">
+          <i class="fa-solid fa-bolt-lightning"></i>
         </div>
         <div class="brand-text">
-          <div class="brand-title">
-            <span class="brand-accent">KOLLS</span> AUTOTRONICS
+          <h1>KOLLS <span class="brand-highlight">AUTOTRONICS</span></h1>
+          <p class="brand-tagline">AI Vehicle Health & Predictive Fleet Diagnostics Platform</p>
+        </div>
+      </div>
+
+      <div class="login-card">
+        <div class="login-card-header">
+          <h2>Select Access Portal</h2>
+          <p>Choose your workspace role to load the designated operations interface</p>
+        </div>
+
+        <!-- Role Selector Cards -->
+        <div class="role-grid">
+          <div class="role-card selected" id="role-fleet-btn" onclick="selectRole('fleet')">
+            <div class="role-indicator"><i class="fa-solid fa-check"></i></div>
+            <div class="role-icon fleet-icon">
+              <i class="fa-solid fa-satellite-dish"></i>
+            </div>
+            <h3>Fleet Manager Command</h3>
+            <p>Aegis Central Tower • Geospatial GPS Telemetry • Triage Queue • 18-Wheel TPMS • Auto Work Orders</p>
+            <span class="role-badge">Mission Control</span>
           </div>
-          <div class="brand-subtitle">
-            <span class="ai-badge">AI-TELEMETRY</span>
-            <span>VEHICLE HEALTH MONITORING SYSTEM</span>
-            <span class="firmware-tag">v3.4.2</span>
+
+          <div class="role-card" id="role-driver-btn" onclick="selectRole('driver')">
+            <div class="role-indicator"><i class="fa-solid fa-check"></i></div>
+            <div class="role-icon driver-icon">
+              <i class="fa-solid fa-id-badge"></i>
+            </div>
+            <h3>Vehicle Driver / Owner</h3>
+            <p>Dynamic 0-100 Health Score • AI Copilot • Financial Avoidance Engine • Driving Style Optimizer</p>
+            <span class="role-badge">In-Cab Intelligence</span>
+          </div>
+        </div>
+
+        <!-- Input Form -->
+        <div class="login-form">
+          <div class="input-group">
+            <label><i class="fa-solid fa-user-astronaut"></i> Operator Identifier</label>
+            <input type="text" id="login-username" value="dispatcher.alpha@kolls.io" placeholder="Enter operator ID or driver badge">
+          </div>
+          <div class="input-group">
+            <label><i class="fa-solid fa-key"></i> Security Credential / PIN</label>
+            <input type="password" id="login-password" value="••••••••••••" placeholder="Enter passcode">
+          </div>
+
+          <button id="login-submit-btn" class="btn-primary-large" onclick="handleLogin()">
+            <span id="login-btn-text">INITIALIZE MISSION CONTROL</span>
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+
+        <!-- Quick Pitch Demo Switcher -->
+        <div class="demo-hints">
+          <span class="hint-label"><i class="fa-solid fa-wand-magic-sparkles"></i> Investor Demo 1-Click Launch:</span>
+          <div class="demo-pills">
+            <button class="pill-btn" onclick="quickLaunch('fleet')"><i class="fa-solid fa-truck-moving"></i> Enter Fleet Command</button>
+            <button class="pill-btn" onclick="quickLaunch('driver')"><i class="fa-solid fa-car-side"></i> Enter Driver Cockpit</button>
           </div>
         </div>
       </div>
 
-      <!-- Center: Vehicle Telemetry ID & Active Health Status -->
-      <div class="header-vehicle-badge">
-        <div class="vehicle-id-pill">
-          <div class="vehicle-icon-wrap">
-            <i class="fa-solid fa-truck-monster"></i>
+      <div class="login-footer">
+        <span><i class="fa-solid fa-shield-halved"></i> 256-bit Encrypted TWAI / CAN Bus Ingestion Protocol</span>
+        <span>Version 2.4.0 • Build 2026.10</span>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- SCREEN 2: FLEET MANAGER SOFTWARE APP (AEGIS COMMAND CENTER)               -->
+  <!-- ========================================================================= -->
+  <div id="fleet-view" class="view-screen">
+    
+    <!-- ZONE 1: GLOBAL HEADER BAR (TOP COMMAND RIBBON) -->
+    <header id="fm-header">
+      <!-- Left Side: Brand & Fleet Switcher -->
+      <div class="fm-header-left">
+        <div class="fm-brand" onclick="switchRoleToLogin()">
+          <div class="fm-logo-pulse"><i class="fa-solid fa-circle-nodes"></i></div>
+          <div class="fm-brand-names">
+            <span class="aegis-title">AEGIS // <span class="text-cyan">KOLLS</span></span>
+            <span class="aegis-sub">FLEET COMMAND TOWER</span>
           </div>
-          <div class="vehicle-info-block">
-            <span class="vehicle-label">TELEMETRY TARGET</span>
-            <span class="vehicle-id-text" id="vehicleIdDisplay">KA-TRUCK-001</span>
+        </div>
+
+        <div class="fm-division-picker">
+          <i class="fa-solid fa-diagram-project"></i>
+          <select id="fleet-selector" onchange="changeFleetDivision(this.value)">
+            <option value="north">North Region Haulage Fleet (142 Units)</option>
+            <option value="midwest" selected>Midwest Interstate Express (98 Units)</option>
+            <option value="south">Southern Corridor Heavy Transport (115 Units)</option>
+            <option value="metro">Metro Logistics Direct (64 Units)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Center Section: Live Master Counters -->
+      <div class="fm-header-center">
+        <div class="master-counter-pill" title="Total Fleet Asset Allocation">
+          <span class="counter-label">FLEET SIZE</span>
+          <span class="counter-val" id="fm-total-trucks">142</span>
+          <span class="counter-meta">
+            <span class="text-green" id="fm-active-count">128 Hwy</span> • 
+            <span class="text-yellow" id="fm-resting-count">10 Rest</span> • 
+            <span class="text-red" id="fm-repair-count">4 Bay</span>
+          </span>
+        </div>
+
+        <div class="master-counter-pill" title="Real-Time Fleet Health Aggregation">
+          <span class="counter-label">FLEET HEALTH AVG</span>
+          <span class="counter-val text-green" id="fm-health-score">94.2%</span>
+          <div class="mini-health-bar">
+            <div class="mini-fill" style="width: 94.2%"></div>
           </div>
-          <div class="vehicle-status-pill" id="systemHealthBadge">
-            <span class="status-pulse-dot nominal" id="systemHealthDot"></span>
-            <span id="systemHealthText">SYSTEM NOMINAL</span>
+        </div>
+
+        <div class="master-counter-pill alert-pill" title="Actionable Mechanical Faults">
+          <span class="counter-label">TRIAGE REQUIRED</span>
+          <div class="badge-cluster">
+            <span class="badge-critical" id="fm-critical-count"><i class="fa-solid fa-triangle-exclamation"></i> 2 Critical</span>
+            <span class="badge-warning" id="fm-warning-count"><i class="fa-solid fa-circle-exclamation"></i> 5 Warning</span>
           </div>
         </div>
       </div>
 
-      <!-- Right: MQTT Connection Indicator, Mode Switch & Clock -->
-      <div class="header-controls">
-        <!-- MQTT Connection Status -->
-        <div class="connection-status-card" id="connectionStatusCard">
-          <span class="status-dot connecting" id="mqttStatusDot"></span>
-          <div class="connection-text-group">
-            <span class="conn-label">TELEMETRY LINK</span>
-            <span class="conn-state" id="mqttStatusText">CONNECTING...</span>
-          </div>
+      <!-- Right Side: Search, Clock, Controls & Role Switch -->
+      <div class="fm-header-right">
+        <div class="fm-search-bar">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="fm-search" placeholder="Search Truck #, Driver, or VIN..." oninput="handleFleetSearch(this.value)">
         </div>
 
-        <!-- Mode Toggle Pill -->
-        <button class="mode-toggle-btn" id="modeToggleBtn" title="Toggle between Live MQTT and Autonomous Simulator">
-          <i class="fa-solid fa-satellite-dish" id="modeIcon"></i>
-          <span id="modeText">LIVE MQTT</span>
-        </button>
+        <div class="fm-telemetry-clock">
+          <span class="clock-label">UTC TELEMETRY</span>
+          <span class="clock-time font-mono" id="fm-clock">17:09:54</span>
+        </div>
 
-        <!-- Sound Toggle -->
-        <button class="audio-toggle-btn" id="audioToggleBtn" title="Toggle Audio Synthesizer Beeps">
-          <i class="fa-solid fa-volume-xmark" id="audioIcon"></i>
-        </button>
-
-        <!-- Digital Telemetry Clock -->
-        <div class="digital-clock-panel">
-          <span class="clock-label">TELEMETRY UTC</span>
-          <span class="clock-time" id="digitalClock">--:--:--</span>
+        <div class="fm-quick-actions">
+          <button class="btn-icon" id="fm-audio-btn" title="Toggle Acoustic Radar Chimes" onclick="toggleAudioChimes()">
+            <i class="fa-solid fa-volume-high"></i>
+          </button>
+          <button class="btn-icon" title="Trigger Simulation Lab Anomaly" onclick="openSimLabModal()">
+            <i class="fa-solid fa-flask"></i>
+          </button>
+          <button class="btn-role-swap" title="Switch to In-Cab Driver Experience" onclick="switchToDriverView()">
+            <i class="fa-solid fa-user"></i> Driver App
+          </button>
+          <button class="btn-icon text-red" title="Log Out" onclick="switchRoleToLogin()">
+            <i class="fa-solid fa-power-off"></i>
+          </button>
         </div>
       </div>
     </header>
 
-    <!-- ================================================================= -->
-    <!-- QUICK METRIC RIBBON: HIGH-LEVEL STATS & SENSOR SUMMARY           -->
-    <!-- ================================================================= -->
-    <section class="metrics-ribbon">
-      <div class="ribbon-card glass-panel">
-        <div class="ribbon-icon cyan"><i class="fa-solid fa-gauge-high"></i></div>
-        <div class="ribbon-data">
-          <span class="ribbon-label">ENGINE SPEED</span>
-          <span class="ribbon-value" id="ribbonRpm">2,400 <span class="unit">RPM</span></span>
-        </div>
-        <div class="ribbon-trend positive" id="ribbonRpmZone">NORMAL</div>
-      </div>
+    <!-- MAIN FLEET WORKSPACE: ZONES 2, 3 & 4 -->
+    <div id="fm-workspace">
 
-      <div class="ribbon-card glass-panel">
-        <div class="ribbon-icon blue"><i class="fa-solid fa-temperature-three-quarters"></i></div>
-        <div class="ribbon-data">
-          <span class="ribbon-label">COOLANT TEMP</span>
-          <span class="ribbon-value" id="ribbonCoolant">85 <span class="unit">°C</span></span>
-        </div>
-        <div class="ribbon-trend positive" id="ribbonCoolantStatus">OPTIMAL</div>
-      </div>
-
-      <div class="ribbon-card glass-panel">
-        <div class="ribbon-icon amber"><i class="fa-solid fa-oil-can"></i></div>
-        <div class="ribbon-data">
-          <span class="ribbon-label">OIL TEMP</span>
-          <span class="ribbon-value" id="ribbonOil">92 <span class="unit">°C</span></span>
-        </div>
-        <div class="ribbon-trend neutral" id="ribbonThermalDelta">ΔT +7°C</div>
-      </div>
-
-      <div class="ribbon-card glass-panel">
-        <div class="ribbon-icon green"><i class="fa-solid fa-car-battery"></i></div>
-        <div class="ribbon-data">
-          <span class="ribbon-label">ALTERNATOR BUS</span>
-          <span class="ribbon-value" id="ribbonVoltage">13.8 <span class="unit">V</span></span>
-        </div>
-        <div class="ribbon-trend positive">CHARGING</div>
-      </div>
-
-      <div class="ribbon-card glass-panel">
-        <div class="ribbon-icon purple"><i class="fa-solid fa-brain"></i></div>
-        <div class="ribbon-data">
-          <span class="ribbon-label">AI HEALTH INDEX</span>
-          <span class="ribbon-value" id="aiHealthIndex">98.8 <span class="unit">%</span></span>
-        </div>
-        <div class="ribbon-trend positive">0 ANOMALIES</div>
-      </div>
-    </section>
-
-    <!-- ================================================================= -->
-    <!-- MAIN INTERACTIVE GRID: GAUGES, THERMAL, AI FUEL TRIM & LOGS       -->
-    <!-- ================================================================= -->
-    <main class="dashboard-grid">
-
-      <!-- =============================================================== -->
-      <!-- SECTION 1: CENTRAL DYNAMIC GAUGE CLUSTER                       -->
-      <!-- =============================================================== -->
-      <section class="grid-card central-cluster-card glass-panel">
-        <div class="card-header">
-          <div class="card-title">
-            <i class="fa-solid fa-tachograph-digital"></i>
-            <span>POWERTRAIN DYNAMIC CLUSTER</span>
+      <!-- ZONE 2: PREDICTIVE TRIAGE QUEUE (LEFT SIDEBAR ACTION LIST) -->
+      <aside id="fm-triage">
+        <div class="triage-header">
+          <div class="triage-title-row">
+            <h3><i class="fa-solid fa-list-check"></i> PREDICTIVE TRIAGE QUEUE</h3>
+            <span class="triage-live-badge"><span class="live-dot"></span> LIVE SORT</span>
           </div>
-          <div class="card-badge" id="powertrainModeBadge">CLOSED LOOP ACTIVE</div>
-        </div>
-
-        <div class="cluster-body">
+          <p class="triage-desc">AI priority sort: automated repair horizons from worst to safest</p>
           
-          <!-- RPM Semi-Circular Gauge (Hero) -->
-          <div class="rpm-gauge-container">
-            <div class="rpm-gauge-wrapper">
-              <svg class="rpm-svg-gauge" viewBox="0 0 280 170" id="rpmSvg">
-                <defs>
-                  <!-- Base Track Glow Filter -->
-                  <filter id="gaugeGlow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation="3" result="blur" />
-                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                  </filter>
-                  
-                  <!-- Dynamic Progress Arc Gradients -->
-                  <linearGradient id="rpmGradientNominal" x1="0%" y1="100%" x2="100%" y2="0%">
-                    <stop offset="0%" stop-color="#0088ff" />
-                    <stop offset="70%" stop-color="#00d4ff" />
-                    <stop offset="100%" stop-color="#00ff88" />
-                  </linearGradient>
-
-                  <linearGradient id="rpmGradientWarning" x1="0%" y1="100%" x2="100%" y2="0%">
-                    <stop offset="0%" stop-color="#00d4ff" />
-                    <stop offset="60%" stop-color="#ffcc00" />
-                    <stop offset="100%" stop-color="#ff8800" />
-                  </linearGradient>
-
-                  <linearGradient id="rpmGradientDanger" x1="0%" y1="100%" x2="100%" y2="0%">
-                    <stop offset="0%" stop-color="#ffcc00" />
-                    <stop offset="50%" stop-color="#ff3344" />
-                    <stop offset="100%" stop-color="#ff0055" />
-                  </linearGradient>
-
-                  <!-- Glass Sheen Linear Gradient -->
-                  <linearGradient id="glassSheen" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stop-color="rgba(255,255,255,0.18)" />
-                    <stop offset="100%" stop-color="rgba(255,255,255,0)" />
-                  </linearGradient>
-                </defs>
-
-                <!-- Outer Decorative Glow Ring -->
-                <path d="M 25 145 A 115 115 0 0 1 255 145" class="gauge-outer-ring" />
-
-                <!-- Background Track (Semi-Circle Arc) -->
-                <path d="M 35 145 A 105 105 0 0 1 245 145" class="gauge-track-bg" />
-
-                <!-- Color Zone Indicator Segments -->
-                <path d="M 35 145 A 105 105 0 0 1 114 47" class="zone-arc zone-green" />
-                <path d="M 114 47 A 105 105 0 0 1 202 61" class="zone-arc zone-yellow" />
-                <path d="M 202 61 A 105 105 0 0 1 245 145" class="zone-arc zone-red" />
-
-                <!-- Animated Active Progress Arc -->
-                <path d="M 35 145 A 105 105 0 0 1 245 145" 
-                      class="gauge-progress-arc" 
-                      id="rpmProgressArc" 
-                      stroke="url(#rpmGradientNominal)" />
-
-                <!-- Gauge Ticks & Scale Numerals -->
-                <!-- 0 -->
-                <line x1="35" y1="145" x2="47" y2="145" class="gauge-tick major" />
-                <text x="52" y="148" class="gauge-tick-label">0</text>
-                <!-- 1 -->
-                <line x1="42" y1="113" x2="53" y2="117" class="gauge-tick minor" />
-                <!-- 2 -->
-                <line x1="62" y1="84" x2="71" y2="92" class="gauge-tick major" />
-                <text x="76" y="99" class="gauge-tick-label">2</text>
-                <!-- 3 -->
-                <line x1="91" y1="62" x2="98" y2="72" class="gauge-tick minor" />
-                <!-- 4 -->
-                <line x1="126" y1="48" x2="130" y2="60" class="gauge-tick major" />
-                <text x="135" y="72" class="gauge-tick-label">4</text>
-                <!-- 5 -->
-                <line x1="165" y1="46" x2="162" y2="58" class="gauge-tick minor" />
-                <!-- 6 (Redline entry) -->
-                <line x1="202" y1="61" x2="194" y2="71" class="gauge-tick major redline-tick" />
-                <text x="187" y="84" class="gauge-tick-label redline-label">6</text>
-                <!-- 7 -->
-                <line x1="230" y1="90" x2="219" y2="97" class="gauge-tick minor redline-tick" />
-                <!-- 8 -->
-                <line x1="245" y1="145" x2="233" y2="145" class="gauge-tick major redline-tick" />
-                <text x="221" y="148" class="gauge-tick-label redline-label">8</text>
-
-                <!-- Needle Indicator -->
-                <g id="rpmNeedleGroup" transform="rotate(-90 140 145)">
-                  <!-- Needle Glow Shadow -->
-                  <line x1="140" y1="145" x2="140" y2="35" class="gauge-needle-glow" />
-                  <!-- Needle Line -->
-                  <line x1="140" y1="145" x2="140" y2="38" class="gauge-needle" id="rpmNeedleLine" />
-                  <!-- Center Pivot Hub -->
-                  <circle cx="140" cy="145" r="14" class="gauge-needle-hub" />
-                  <circle cx="140" cy="145" r="6" class="gauge-needle-hub-inner" />
-                </g>
-              </svg>
-
-              <!-- Digital Readout Cluster In Center Of Gauge Arc -->
-              <div class="rpm-digital-center">
-                <span class="rpm-value-number" id="rpmValue">2,400</span>
-                <span class="rpm-unit-label">RPM &times; 1000</span>
-                <div class="rpm-zone-pill nominal" id="rpmZonePill">NOMINAL CRUISE</div>
-              </div>
-
-              <!-- Redline Flasher Indicator -->
-              <div class="rpm-redline-warning" id="rpmRedlineAlert">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                <span>REDLINE OVER-REV</span>
-              </div>
-            </div>
-            
-            <div class="gauge-footer-stats">
-              <div class="footer-stat-item">
-                <span class="f-label">MAX RPM RECORDED</span>
-                <span class="f-val" id="maxRpmRecorded">3,850</span>
-              </div>
-              <div class="footer-stat-item">
-                <span class="f-label">IDLE BASELINE</span>
-                <span class="f-val">820 RPM</span>
-              </div>
-              <div class="footer-stat-item">
-                <span class="f-label">REDLINE LIMIT</span>
-                <span class="f-val redline-text">6,500 RPM</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Vertical Bar Gauges Flanking/Paired with Central Cluster -->
-          <div class="vertical-gauges-cluster">
-
-            <!-- Engine Load Vertical Bar Gauge -->
-            <div class="vertical-gauge-card glass-subpanel">
-              <div class="v-gauge-header">
-                <span class="v-gauge-title">ENGINE LOAD</span>
-                <i class="fa-solid fa-weight-hanging v-icon"></i>
-              </div>
-
-              <div class="v-gauge-body">
-                <!-- Scale Marks -->
-                <div class="v-scale-labels">
-                  <span>100%</span>
-                  <span>75%</span>
-                  <span>50%</span>
-                  <span>25%</span>
-                  <span>0%</span>
-                </div>
-
-                <!-- Glass Tube Container -->
-                <div class="v-tube-container">
-                  <div class="v-tube-glow"></div>
-                  <!-- Liquid Fill Bar -->
-                  <div class="v-tube-fill load-gradient" id="engineLoadFill" style="height: 45%;">
-                    <div class="v-tube-meniscus"></div>
-                  </div>
-                  <!-- Grid Hash Lines on Tube -->
-                  <div class="v-tube-ticks"></div>
-                </div>
-              </div>
-
-              <div class="v-gauge-footer">
-                <div class="v-numeric-display">
-                  <span class="v-numeric-val" id="engineLoadValue">45</span>
-                  <span class="v-numeric-unit">%</span>
-                </div>
-                <span class="v-status-badge" id="loadStatusBadge">MODERATE LOAD</span>
-              </div>
-            </div>
-
-            <!-- Battery Voltage Vertical Bar Gauge -->
-            <div class="vertical-gauge-card glass-subpanel">
-              <div class="v-gauge-header">
-                <span class="v-gauge-title">BATTERY BUS</span>
-                <i class="fa-solid fa-bolt v-icon"></i>
-              </div>
-
-              <div class="v-gauge-body">
-                <!-- Scale Marks (10V - 15V) -->
-                <div class="v-scale-labels">
-                  <span>15.0V</span>
-                  <span>14.0V</span>
-                  <span>13.0V</span>
-                  <span>12.0V</span>
-                  <span>10.0V</span>
-                </div>
-
-                <!-- Glass Tube Container -->
-                <div class="v-tube-container">
-                  <div class="v-tube-glow"></div>
-                  <!-- Liquid Fill Bar (calibrated 10V-15V) -->
-                  <div class="v-tube-fill voltage-nominal" id="batteryVoltageFill" style="height: 76%;">
-                    <div class="v-tube-meniscus"></div>
-                  </div>
-                  <!-- Grid Hash Lines on Tube -->
-                  <div class="v-tube-ticks"></div>
-                </div>
-              </div>
-
-              <div class="v-gauge-footer">
-                <div class="v-numeric-display">
-                  <span class="v-numeric-val" id="batteryVoltageValue">13.8</span>
-                  <span class="v-numeric-unit">V</span>
-                </div>
-                <span class="v-status-badge positive" id="voltageStatusBadge">OPTIMAL 13.8V</span>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      <!-- =============================================================== -->
-      <!-- SECTION 2: THERMAL CLUSTER & OIL VS COOLANT TREND CHART        -->
-      <!-- =============================================================== -->
-      <section class="grid-card thermal-cluster-card glass-panel">
-        <div class="card-header">
-          <div class="card-title">
-            <i class="fa-solid fa-fire-burner"></i>
-            <span>THERMAL CLUSTER & HEAT DISSIPATION</span>
-          </div>
-          <div class="card-meta">
-            <span class="sensor-tag">THERMOSTAT DYNAMICS</span>
+          <!-- Category Filter Tabs -->
+          <div class="triage-filter-bar" id="fm-filter-btns">
+            <button class="triage-filter-btn active" data-filter="all" onclick="filterTriage('all')">All (8)</button>
+            <button class="triage-filter-btn filter-crit" data-filter="critical" onclick="filterTriage('critical')">Critical (2)</button>
+            <button class="triage-filter-btn filter-warn" data-filter="warning" onclick="filterTriage('warning')">Warning (4)</button>
+            <button class="triage-filter-btn filter-sched" data-filter="scheduled" onclick="filterTriage('scheduled')">Sched (2)</button>
           </div>
         </div>
 
-        <div class="thermal-card-body">
-          <!-- Readouts Bar -->
-          <div class="thermal-kpis-grid">
-            <!-- Coolant Readout -->
-            <div class="thermal-kpi-item glass-subpanel" id="coolantKpiCard">
-              <div class="kpi-icon-row">
-                <i class="fa-solid fa-temperature-arrow-up"></i>
-                <span class="kpi-subtext">COOLANT SENSOR (ECT)</span>
-              </div>
-              <div class="kpi-number-row">
-                <span class="kpi-big-val nominal" id="coolantTempValue">85</span>
-                <span class="kpi-big-unit">°C</span>
-              </div>
-              <div class="kpi-zone-bar">
-                <div class="kpi-zone-fill" id="coolantZoneFill" style="width: 65%;"></div>
-              </div>
-              <div class="kpi-status-text" id="coolantStatusText">NOMINAL (80-95°C)</div>
-            </div>
+        <!-- Scrollable Cards Container -->
+        <div class="triage-scroll-area" id="fm-triage-list">
+          <!-- Dynamic cards injected via JavaScript with countdown timers -->
+        </div>
+      </aside>
 
-            <!-- Oil Readout -->
-            <div class="thermal-kpi-item glass-subpanel" id="oilKpiCard">
-              <div class="kpi-icon-row">
-                <i class="fa-solid fa-oil-can"></i>
-                <span class="kpi-subtext">ENGINE OIL (EOT)</span>
-              </div>
-              <div class="kpi-number-row">
-                <span class="kpi-big-val nominal" id="oilTempValue">92</span>
-                <span class="kpi-big-unit">°C</span>
-              </div>
-              <div class="kpi-zone-bar">
-                <div class="kpi-zone-fill amber" id="oilZoneFill" style="width: 72%;"></div>
-              </div>
-              <div class="kpi-status-text" id="oilStatusText">OPTIMAL VISCOSITY</div>
-            </div>
+      <!-- ZONE 3: GEOSPATIAL LIVE MAP CANVAS (MAIN CENTER) -->
+      <main id="fm-map-container">
+        <!-- Leaflet Map Container -->
+        <div id="fm-map"></div>
 
-            <!-- Intake Air Temp Readout -->
-            <div class="thermal-kpi-item glass-subpanel">
-              <div class="kpi-icon-row">
-                <i class="fa-solid fa-wind"></i>
-                <span class="kpi-subtext">INTAKE AIR (IAT)</span>
-              </div>
-              <div class="kpi-number-row">
-                <span class="kpi-big-val" id="intakeAirValue">35</span>
-                <span class="kpi-big-unit">°C</span>
-              </div>
-              <div class="kpi-zone-bar">
-                <div class="kpi-zone-fill cyan" style="width: 35%;"></div>
-              </div>
-              <div class="kpi-status-text">AMBIENT AIRFLOW NORMAL</div>
+        <!-- Floating Map Layer Controls (Top Right of Map) -->
+        <div class="map-layer-controls">
+          <div class="layer-title"><i class="fa-solid fa-layer-group"></i> MAP OVERLAYS</div>
+          <label class="layer-toggle">
+            <input type="checkbox" id="layer-traffic-toggle" checked onchange="toggleMapLayer('traffic')">
+            <span class="toggle-slider"></span>
+            <span class="toggle-label"><i class="fa-solid fa-road"></i> Live Highway Traffic</span>
+          </label>
+          <label class="layer-toggle">
+            <input type="checkbox" id="layer-weather-toggle" checked onchange="toggleMapLayer('weather')">
+            <span class="toggle-slider"></span>
+            <span class="toggle-label"><i class="fa-solid fa-cloud-bolt"></i> Doppler Radar</span>
+          </label>
+          <label class="layer-toggle">
+            <input type="checkbox" id="layer-depots-toggle" checked onchange="toggleMapLayer('depots')">
+            <span class="toggle-slider"></span>
+            <span class="toggle-label"><i class="fa-solid fa-warehouse"></i> Service Hub Geofences</span>
+          </label>
+        </div>
+
+        <!-- Map Quick Legend (Bottom Left of Map) -->
+        <div class="map-legend">
+          <div class="legend-item"><span class="legend-dot dot-green"></span> Nominal (128)</div>
+          <div class="legend-item"><span class="legend-dot dot-yellow"></span> Minor Warning (5)</div>
+          <div class="legend-item"><span class="legend-dot dot-red"></span> Critical RUL Alert (2)</div>
+          <div class="legend-item"><span class="legend-dot dot-blue"></span> Service Hub (4)</div>
+        </div>
+      </main>
+
+      <!-- ZONE 4: DEEP ASSET INSPECTOR (RIGHT SLIDE-OVER DRAWER) -->
+      <section id="fm-inspector" class="inspector-drawer">
+        <!-- Close Drawer Button -->
+        <button class="btn-drawer-close" onclick="closeInspector()" title="Close Deep Inspector">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <!-- Top Drawer Header & GPS Contract -->
+        <div class="drawer-header">
+          <div class="drawer-identity-row">
+            <div class="truck-badge-large">
+              <span class="truck-num" id="insp-truck-id">TRUCK #402</span>
+              <span class="truck-status-badge status-crit" id="insp-status-badge">CRITICAL ALERT</span>
+            </div>
+            <div class="drawer-metrics">
+              <span class="metric-chip"><i class="fa-solid fa-bolt"></i> <span id="insp-voltage">13.8V</span></span>
+              <span class="metric-chip"><i class="fa-solid fa-wifi"></i> 5G TWAI</span>
             </div>
           </div>
 
-          <!-- Oil vs Coolant Trend Chart Canvas -->
-          <div class="chart-container-wrap">
-            <div class="chart-sub-header">
-              <span class="chart-sub-title">OIL VS COOLANT TEMPERATURE DRIFT (LAST 30 CYCLES)</span>
-              <div class="chart-legend-custom">
-                <span class="legend-item"><span class="legend-dot coolant-dot"></span> Coolant (°C)</span>
-                <span class="legend-item"><span class="legend-dot oil-dot"></span> Oil (°C)</span>
+          <div class="drawer-driver-row">
+            <span><i class="fa-solid fa-user-tie"></i> Driver: <strong id="insp-driver">John Doe</strong></span>
+            <span><i class="fa-solid fa-barcode"></i> VIN: <span class="font-mono text-muted" id="insp-vin">1FUJBBC97NL62881</span></span>
+          </div>
+
+          <div class="drawer-telemetry-strip">
+            <div class="strip-item">
+              <i class="fa-solid fa-location-crosshairs text-cyan"></i>
+              <div class="strip-info">
+                <span class="strip-label">HIGHWAY CONTRACT</span>
+                <span class="strip-val" id="insp-location">I-80 Westbound near Grinnell, IA (MP 182)</span>
               </div>
             </div>
-            <div class="chart-canvas-box">
-              <canvas id="thermalTrendChart"></canvas>
+            <div class="strip-item">
+              <i class="fa-solid fa-gauge-high text-yellow"></i>
+              <div class="strip-info">
+                <span class="strip-label">GROUND SPEED</span>
+                <span class="strip-val font-mono" id="insp-speed">64 MPH</span>
+              </div>
+            </div>
+            <div class="strip-item">
+              <i class="fa-solid fa-compass text-green"></i>
+              <div class="strip-info">
+                <span class="strip-label">COMPASS HEADING</span>
+                <span class="strip-val font-mono" id="insp-heading">274° WNW</span>
+              </div>
             </div>
           </div>
         </div>
-      </section>
 
-      <!-- =============================================================== -->
-      <!-- SECTION 3: AI TREND ANALYSIS (STFT & LTFT FUEL TRIM DRIFT)      -->
-      <!-- =============================================================== -->
-      <section class="grid-card ai-fuel-trim-card glass-panel">
-        <div class="card-header">
-          <div class="card-title">
-            <i class="fa-solid fa-dna"></i>
-            <span>AI TREND ANALYSIS &bull; CLOSED-LOOP FUEL TRIM DRIFT</span>
-          </div>
-          <div class="ai-status-indicator">
-            <span class="ai-brain-pulse"></span>
-            <span class="ai-model-tag">NEURAL MODEL: LAMBDA-PREDICT v2.8</span>
-          </div>
+        <!-- 4 Functional Tabs -->
+        <div class="drawer-tabs" id="insp-tabs">
+          <button class="tab-btn active" onclick="switchInspectorTab('diagnostics')">
+            <i class="fa-solid fa-microchip"></i> AI Diagnostics
+          </button>
+          <button class="tab-btn" onclick="switchInspectorTab('telemetry')">
+            <i class="fa-solid fa-chart-line"></i> Live Stream (50Hz)
+          </button>
+          <button class="tab-btn" onclick="switchInspectorTab('driver')">
+            <i class="fa-solid fa-id-card-clip"></i> Driver & HOS
+          </button>
+          <button class="tab-btn" onclick="switchInspectorTab('workorder')">
+            <i class="fa-solid fa-clipboard-check"></i> Work Order
+          </button>
         </div>
 
-        <div class="ai-panel-body">
+        <!-- Drawer Tab Contents Container -->
+        <div class="drawer-tab-content">
           
-          <!-- AI Diagnostic Banner -->
-          <div class="ai-inference-card glass-subpanel" id="aiInferenceBox">
-            <div class="ai-inference-icon">
-              <i class="fa-solid fa-shield-halved"></i>
-            </div>
-            <div class="ai-inference-content">
-              <div class="ai-inference-title">AI COMBUSTION INTEGRITY ASSESSMENT</div>
-              <div class="ai-inference-desc" id="aiInferenceText">
-                ECU closed-loop stoichiometric fuel correction stable. STFT (+2.3%) and LTFT (+4.1%) are well within &plusmn;10% manufacturer thresholds. No unmetered vacuum leak or injector clogging detected.
+          <!-- TAB 1: AI DIAGNOSTICS (EARLY MECHANICAL FAILURE DETECTION) -->
+          <div id="insp-tab-diagnostics" class="tab-panel active">
+            <!-- Subsystem Health Progress Bars -->
+            <div class="card-section">
+              <h4 class="section-title"><i class="fa-solid fa-heart-pulse"></i> Subsystem Prognostic Health</h4>
+              
+              <div class="subsystem-bars">
+                <div class="subsystem-row">
+                  <div class="subsystem-meta">
+                    <span>Powertrain & Combustion</span>
+                    <strong class="text-green" id="diag-powertrain-val">98% Nominal</strong>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill fill-green" id="diag-powertrain" style="width: 98%"></div></div>
+                </div>
+
+                <div class="subsystem-row alert-row">
+                  <div class="subsystem-meta">
+                    <span>Electrical & Charging</span>
+                    <strong class="text-red" id="diag-electrical-val">42% Critical Alert</strong>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill fill-red pulse-fill" id="diag-electrical" style="width: 42%"></div></div>
+                </div>
+
+                <div class="subsystem-row">
+                  <div class="subsystem-meta">
+                    <span>Pneumatic Brakes & Chassis</span>
+                    <strong class="text-green" id="diag-brakes-val">91% Nominal</strong>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill fill-green" id="diag-brakes" style="width: 91%"></div></div>
+                </div>
+
+                <div class="subsystem-row">
+                  <div class="subsystem-meta">
+                    <span>Heavy Transmission & Driveline</span>
+                    <strong class="text-green" id="diag-transmission-val">89% Nominal</strong>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill fill-green" id="diag-transmission" style="width: 89%"></div></div>
+                </div>
               </div>
             </div>
-            <div class="ai-metrics-tag">
-              <div class="ai-substat">
-                <span class="lbl">LAMBDA &lambda;</span>
-                <span class="val" id="lambdaValue">1.002</span>
+
+            <!-- Vibration Spectrum Chart -->
+            <div class="card-section">
+              <div class="section-header-flex">
+                <h4 class="section-title"><i class="fa-solid fa-wave-square"></i> Alternator Vibration FFT Spectrum</h4>
+                <span class="spectrum-badge"><i class="fa-solid fa-triangle-exclamation"></i> 120 Hz Peak</span>
               </div>
-              <div class="ai-substat">
-                <span class="lbl">PREDICTIVE ANOMALY RISK</span>
-                <span class="val green" id="anomalyRiskVal">0.8%</span>
+              <div class="chart-wrapper">
+                <canvas id="diag-vibration-chart" height="150"></canvas>
+              </div>
+              <p class="chart-caption">Rotordynamic spectral analysis: Gray line = baseline tolerance. Red spike = bearing surface degradation frequency.</p>
+            </div>
+
+            <!-- Plain English AI Diagnostic Synthesis -->
+            <div class="card-section ai-synthesis-card">
+              <div class="ai-badge-row">
+                <span class="ai-pill"><i class="fa-solid fa-brain"></i> KOLLS NEURAL ENGINE</span>
+                <span class="ai-confidence">96.4% Confidence Rating</span>
+              </div>
+              <div class="ai-body-text" id="diag-ai-text">
+                <p><strong>Primary Defect Signature:</strong> High-frequency harmonic vibration detected at <strong>120 Hz</strong> on the alternator drive-end needle bearing. Rotor micro-wobble is causing intermittent diode rectifier brush separation.</p>
+                <div class="ai-consequence-box">
+                  <i class="fa-solid fa-hourglass-half text-red"></i>
+                  <div>
+                    <strong>Prognostic Time-To-Failure:</strong> <span class="text-red font-mono" id="diag-rul-val">3.5 Hours remaining</span> under current electrical draw before total stator lockup, serpentine belt ejection, and complete battery drain on I-80.
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Dual Fuel Trim Chart Canvases -->
-          <div class="fuel-charts-grid">
-            
-            <!-- STFT Chart -->
-            <div class="fuel-chart-box glass-subpanel">
-              <div class="fuel-chart-header">
-                <div class="fuel-chart-title">
-                  <span>SHORT-TERM FUEL TRIM (STFT)</span>
-                  <span class="current-val" id="stftCurrentVal">+2.3%</span>
-                </div>
-                <span class="threshold-pill">&plusmn;10% THRESHOLD</span>
+          <!-- TAB 2: LIVE TELEMETRY (50Hz REAL-TIME SENSOR STREAM) -->
+          <div id="insp-tab-telemetry" class="tab-panel">
+            <!-- Real-time Engine Gauges Grid -->
+            <div class="telemetry-grid">
+              <div class="tele-gauge-card">
+                <span class="gauge-label">ENGINE SPEED</span>
+                <span class="gauge-val font-mono" id="tele-rpm">1,480</span>
+                <span class="gauge-unit">RPM</span>
+                <div class="gauge-bar"><div class="g-fill" style="width: 55%"></div></div>
               </div>
-              <div class="fuel-canvas-holder">
-                <canvas id="stftChart"></canvas>
+              <div class="tele-gauge-card">
+                <span class="gauge-label">COOLANT HEAT</span>
+                <span class="gauge-val font-mono" id="tele-coolant">198</span>
+                <span class="gauge-unit">°F (ECT)</span>
+                <div class="gauge-bar"><div class="g-fill fill-green" style="width: 62%"></div></div>
+              </div>
+              <div class="tele-gauge-card">
+                <span class="gauge-label">OIL PRESSURE</span>
+                <span class="gauge-val font-mono" id="tele-oil-press">46</span>
+                <span class="gauge-unit">PSI</span>
+                <div class="gauge-bar"><div class="g-fill fill-green" style="width: 70%"></div></div>
+              </div>
+              <div class="tele-gauge-card">
+                <span class="gauge-label">FUEL BURN RATE</span>
+                <span class="gauge-val font-mono" id="tele-fuel-burn">7.2</span>
+                <span class="gauge-unit">GAL / HR</span>
+                <div class="gauge-bar"><div class="g-fill fill-cyan" style="width: 48%"></div></div>
+              </div>
+              <div class="tele-gauge-card">
+                <span class="gauge-label">DEF FLUID LEVEL</span>
+                <span class="gauge-val font-mono" id="tele-def">82%</span>
+                <span class="gauge-unit">RESERVOIR</span>
+                <div class="gauge-bar"><div class="g-fill fill-green" style="width: 82%"></div></div>
+              </div>
+              <div class="tele-gauge-card">
+                <span class="gauge-label">TURBO BOOST</span>
+                <span class="gauge-val font-mono" id="tele-boost">24.5</span>
+                <span class="gauge-unit">PSI</span>
+                <div class="gauge-bar"><div class="g-fill fill-cyan" style="width: 65%"></div></div>
               </div>
             </div>
 
-            <!-- LTFT Chart -->
-            <div class="fuel-chart-box glass-subpanel">
-              <div class="fuel-chart-header">
-                <div class="fuel-chart-title">
-                  <span>LONG-TERM FUEL TRIM (LTFT)</span>
-                  <span class="current-val" id="ltftCurrentVal">+4.1%</span>
-                </div>
-                <span class="threshold-pill warning-pill">&plusmn;10% DRIFT LIMIT</span>
+            <!-- 18-WHEEL TRACTOR-TRAILER TPMS BLUEPRINT -->
+            <div class="card-section tpms-blueprint-section">
+              <div class="section-header-flex">
+                <h4 class="section-title"><i class="fa-solid fa-truck-ramp-box"></i> 18-Wheel Commercial TPMS Blueprint</h4>
+                <span class="tpms-legend"><span class="legend-dot dot-green"></span> 100-110 PSI Nominal</span>
               </div>
-              <div class="fuel-canvas-holder">
-                <canvas id="ltftChart"></canvas>
+              
+              <div class="tpms-blueprint-container">
+                <!-- Visual Top-Down Truck SVG with Tire Positions -->
+                <div class="truck-chassis-svg">
+                  <!-- TRACTOR FRONT STEER AXLE -->
+                  <div class="axle-group">
+                    <span class="axle-label">STEER AXLE</span>
+                    <div class="axle-row">
+                      <div class="tire-node ok" id="tire-1"><span class="t-psi">108</span><span class="t-pos">L1</span></div>
+                      <div class="axle-bar"></div>
+                      <div class="tire-node ok" id="tire-2"><span class="t-psi">107</span><span class="t-pos">R1</span></div>
+                    </div>
+                  </div>
+
+                  <!-- TRACTOR DRIVE AXLES (DUAL REAR) -->
+                  <div class="axle-group">
+                    <span class="axle-label">FORWARD DRIVE</span>
+                    <div class="axle-row dual-wheels">
+                      <div class="dual-pair">
+                        <div class="tire-node ok" id="tire-3"><span class="t-psi">102</span><span class="t-pos">L2o</span></div>
+                        <div class="tire-node ok" id="tire-4"><span class="t-psi">103</span><span class="t-pos">L2i</span></div>
+                      </div>
+                      <div class="axle-bar"></div>
+                      <div class="dual-pair">
+                        <div class="tire-node ok" id="tire-5"><span class="t-psi">102</span><span class="t-pos">R2i</span></div>
+                        <div class="tire-node ok" id="tire-6"><span class="t-psi">104</span><span class="t-pos">R2o</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="axle-group">
+                    <span class="axle-label">REAR DRIVE</span>
+                    <div class="axle-row dual-wheels">
+                      <div class="dual-pair">
+                        <div class="tire-node ok" id="tire-7"><span class="t-psi">101</span><span class="t-pos">L3o</span></div>
+                        <div class="tire-node ok" id="tire-8"><span class="t-psi">101</span><span class="t-pos">L3i</span></div>
+                      </div>
+                      <div class="axle-bar"></div>
+                      <div class="dual-pair">
+                        <div class="tire-node ok" id="tire-9"><span class="t-psi">103</span><span class="t-pos">R3i</span></div>
+                        <div class="tire-node ok" id="tire-10"><span class="t-psi">102</span><span class="t-pos">R3o</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- HITCH PIN / KINGPIN -->
+                  <div class="trailer-hitch-line">
+                    <div class="hitch-icon"><i class="fa-solid fa-link"></i> 53ft DRY VAN TRAILER</div>
+                  </div>
+
+                  <!-- TRAILER TANDEM AXLES -->
+                  <div class="axle-group">
+                    <span class="axle-label">TRAILER FWD TANDEM</span>
+                    <div class="axle-row dual-wheels">
+                      <div class="dual-pair">
+                        <div class="tire-node ok" id="tire-11"><span class="t-psi">105</span><span class="t-pos">TL1o</span></div>
+                        <div class="tire-node ok" id="tire-12"><span class="t-psi">104</span><span class="t-pos">TL1i</span></div>
+                      </div>
+                      <div class="axle-bar"></div>
+                      <div class="dual-pair">
+                        <div class="tire-node ok" id="tire-13"><span class="t-psi">106</span><span class="t-pos">TR1i</span></div>
+                        <div class="tire-node ok" id="tire-14"><span class="t-psi">105</span><span class="t-pos">TR1o</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="axle-group">
+                    <span class="axle-label">TRAILER REAR TANDEM</span>
+                    <div class="axle-row dual-wheels">
+                      <div class="dual-pair">
+                        <div class="tire-node ok" id="tire-15"><span class="t-psi">104</span><span class="t-pos">TL2o</span></div>
+                        <div class="tire-node ok" id="tire-16"><span class="t-psi">103</span><span class="t-pos">TL2i</span></div>
+                      </div>
+                      <div class="axle-bar"></div>
+                      <div class="dual-pair">
+                        <div class="tire-node ok" id="tire-17"><span class="t-psi">105</span><span class="t-pos">TR2i</span></div>
+                        <div class="tire-node ok" id="tire-18"><span class="t-psi">104</span><span class="t-pos">TR2o</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-
           </div>
 
+          <!-- TAB 3: DRIVER & SHIFT (DRIVER SAFETY & LEGAL COMPLIANCE) -->
+          <div id="insp-tab-driver" class="tab-panel">
+            <div class="card-section">
+              <div class="driver-profile-header">
+                <div class="driver-avatar-box">
+                  <i class="fa-solid fa-user-gear"></i>
+                </div>
+                <div class="driver-name-block">
+                  <h3 id="driver-full-name">John Doe</h3>
+                  <span class="cdl-badge"><i class="fa-solid fa-address-card"></i> CDL-A #IA-90488214</span>
+                  <span class="phone-badge"><i class="fa-solid fa-phone"></i> +1 (515) 890-4412</span>
+                </div>
+                <div class="driver-safety-badge">
+                  <span class="safety-score-number" id="driver-safety-score">98</span>
+                  <span class="safety-score-label">SAFETY RATING</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- HOS Federal Compliance Progress Bars -->
+            <div class="card-section">
+              <h4 class="section-title"><i class="fa-solid fa-business-time"></i> Federal Hours of Service (HOS) Compliance</h4>
+              
+              <div class="hos-group">
+                <div class="hos-item">
+                  <div class="hos-meta">
+                    <span>11-Hour Driving Limit</span>
+                    <strong><span id="hos-drive-used">5h 18m</span> / 11h 00m (5h 42m remaining)</strong>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill fill-green" id="hos-drive" style="width: 48%"></div></div>
+                </div>
+
+                <div class="hos-item">
+                  <div class="hos-meta">
+                    <span>14-Hour On-Duty Shift Window</span>
+                    <strong><span id="hos-shift-used">6h 45m</span> / 14h 00m (7h 15m remaining)</strong>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill fill-cyan" id="hos-shift" style="width: 48%"></div></div>
+                </div>
+
+                <div class="hos-item">
+                  <div class="hos-meta">
+                    <span>70-Hour / 8-Day Weekly Cycle</span>
+                    <strong><span id="hos-weekly-used">42h 10m</span> / 70h 00m (27h 50m remaining)</strong>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill fill-yellow" id="hos-weekly" style="width: 60%"></div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Driver Telematics Score Breakdown -->
+            <div class="card-section">
+              <h4 class="section-title"><i class="fa-solid fa-chart-pie"></i> Driving Behavior Diagnostics</h4>
+              <div class="behavior-chips">
+                <div class="b-chip"><i class="fa-solid fa-check text-green"></i> Smooth Braking: 99%</div>
+                <div class="b-chip"><i class="fa-solid fa-check text-green"></i> Smooth Accel: 97%</div>
+                <div class="b-chip"><i class="fa-solid fa-check text-green"></i> Speed Limit Adherence: 98%</div>
+                <div class="b-chip"><i class="fa-solid fa-circle-exclamation text-yellow"></i> Extended Idle: 14 min</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 4: WORK ORDER (AUTOMATED GARAGE REPAIR DISPATCHING) -->
+          <div id="insp-tab-workorder" class="tab-panel">
+            <div class="card-section wo-header-card">
+              <div class="wo-status-tag">STATUS: <span class="badge-critical" id="wo-status-pill">PRE-DISPATCH STAGED</span></div>
+              <h3 id="wo-title">Emergency Work Order #WO-8902-TR402</h3>
+              <p>Generated automatically by Kolls AI Prognostic Triage Engine</p>
+            </div>
+
+            <div class="card-section">
+              <h4 class="section-title"><i class="fa-solid fa-wrench"></i> Facility & Bay Assignment</h4>
+              <div class="wo-details-grid">
+                <div class="wo-detail">
+                  <span class="detail-label">Assigned Hub:</span>
+                  <strong id="wo-hub">Des Moines Logistics Hub (Exit 137)</strong>
+                </div>
+                <div class="wo-detail">
+                  <span class="detail-label">Designated Bay:</span>
+                  <strong class="text-cyan" id="wo-bay">Diagnostic Bay 3</strong>
+                </div>
+                <div class="wo-detail">
+                  <span class="detail-label">Master Technician:</span>
+                  <strong id="wo-tech">Marcus Vance (ASE Certified Master)</strong>
+                </div>
+                <div class="wo-detail">
+                  <span class="detail-label">Est. Repair Downtime:</span>
+                  <strong class="text-yellow" id="wo-downtime">1.5 Hours</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Reserved OEM Parts List -->
+            <div class="card-section">
+              <h4 class="section-title"><i class="fa-solid fa-boxes-stacked"></i> Reserved OEM Parts in Local Inventory</h4>
+              <table class="parts-table">
+                <thead>
+                  <tr>
+                    <th>Part Number</th>
+                    <th>Component Description</th>
+                    <th>Qty</th>
+                    <th>Staged Location</th>
+                    <th>Inventory Status</th>
+                  </tr>
+                </thead>
+                <tbody id="wo-parts-list">
+                  <tr>
+                    <td class="font-mono">DEL-24SI-160A</td>
+                    <td>Delco Remy 24SI 160A Alternator</td>
+                    <td>1</td>
+                    <td>Shelf B4-Bay 3</td>
+                    <td><span class="badge-reserved"><i class="fa-solid fa-lock"></i> Locked & Reserved</span></td>
+                  </tr>
+                  <tr>
+                    <td class="font-mono">GAT-K080680HD</td>
+                    <td>FleetRunner Heavy-Duty Micro-V Belt</td>
+                    <td>1</td>
+                    <td>Shelf A1-Bay 3</td>
+                    <td><span class="badge-reserved"><i class="fa-solid fa-lock"></i> Locked & Reserved</span></td>
+                  </tr>
+                  <tr>
+                    <td class="font-mono">SKF-6203-2RS</td>
+                    <td>Deep Groove Radial Drive Bearing</td>
+                    <td>1</td>
+                    <td>Bin 12-Bay 3</td>
+                    <td><span class="badge-reserved"><i class="fa-solid fa-lock"></i> Locked & Reserved</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ACTION BUTTONS AT BOTTOM OF INSPECTOR PANEL -->
+        <div class="drawer-action-footer">
+          <button class="btn-action btn-inspect" onclick="startLiveInspect()">
+            <i class="fa-solid fa-stopwatch"></i>
+            <span>2-Min Live Inspect</span>
+          </button>
+          
+          <button class="btn-action btn-sms" onclick="openSMSDialog()">
+            <i class="fa-solid fa-comment-sms"></i>
+            <span>SMS Driver</span>
+          </button>
+          
+          <button class="btn-action btn-workorder" onclick="generateOneClickWorkOrder()">
+            <i class="fa-solid fa-file-invoice-dollar"></i>
+            <span>1-Click Work Order</span>
+          </button>
         </div>
       </section>
 
-      <!-- =============================================================== -->
-      <!-- SECTION 4: ACTIVITY FEED & LIVE TELEMETRY LOG STREAM            -->
-      <!-- =============================================================== -->
-      <section class="grid-card activity-feed-card glass-panel">
-        <div class="card-header">
-          <div class="card-title">
-            <i class="fa-solid fa-wave-square"></i>
-            <span>REAL-TIME DIAGNOSTIC ACTIVITY FEED & AI EVENT STREAM</span>
-          </div>
-          <div class="feed-controls">
-            <span class="entry-counter" id="logCountBadge">0 EVENTS</span>
-            <button class="feed-btn" id="clearLogBtn" title="Clear log container">
-              <i class="fa-solid fa-trash-can"></i> Clear
-            </button>
-            <button class="feed-btn" id="pauseScrollBtn" title="Toggle Auto Scroll">
-              <i class="fa-solid fa-angles-down" id="pauseScrollIcon"></i>
-              <span id="pauseScrollText">Auto-Scroll ON</span>
-            </button>
-          </div>
-        </div>
+    </div>
 
-        <div class="feed-card-body">
-          <!-- Interactive Anomaly Simulation Toolbar (for Investor Pitch Live Demos) -->
-          <div class="demo-anomaly-toolbar">
-            <span class="toolbar-title"><i class="fa-solid fa-flask-vial"></i> DEMO INJECTORS:</span>
-            <button class="demo-btn revs-btn" id="injectRevBtn">
-              <i class="fa-solid fa-gauge"></i> Blip Throttle (5,800 RPM)
-            </button>
-            <button class="demo-btn lean-btn" id="injectLeanBtn">
-              <i class="fa-solid fa-triangle-exclamation"></i> Inject STFT Lean Spike (+14.8%)
-            </button>
-            <button class="demo-btn heat-btn" id="injectOverheatBtn">
-              <i class="fa-solid fa-fire"></i> Inject Coolant Overheat (108°C)
-            </button>
-            <button class="demo-btn batt-btn" id="injectBattSagBtn">
-              <i class="fa-solid fa-battery-quarter"></i> Voltage Sag (11.2V)
-            </button>
-            <button class="demo-btn nominal-btn" id="restoreNominalBtn">
-              <i class="fa-solid fa-rotate-right"></i> Reset Nominal
-            </button>
-          </div>
-
-          <!-- Scrolling Activity Feed List -->
-          <div class="activity-feed-scroll" id="activityFeed">
-            <!-- Dynamic Log Items are injected here via JS addLogEntry() -->
-          </div>
-        </div>
-      </section>
-
-    </main>
-
-    <!-- ================================================================= -->
-    <!-- FOOTER: TELEMETRY METRICS, MQTT BROKER DETAILS & INVESTOR BADGE   -->
-    <!-- ================================================================= -->
-    <footer class="dashboard-footer glass-panel">
-      <div class="footer-left">
-        <span class="footer-indicator-dot"></span>
-        <span>BROKER: <strong id="footerBrokerAddress">broker.hivemq.com:8884/mqtt</strong></span>
-        <span class="divider">&bull;</span>
-        <span>TOPIC: <strong>kolls/vehicle/telemetry</strong></span>
-        <span class="divider">&bull;</span>
-        <span>INGESTION: <strong id="packetsReceivedCount">0</strong> pkts (<span id="ingestHzRate">0.0</span> Hz)</span>
-      </div>
-
-      <div class="footer-center">
-        <span>AI AUTONOMOUS HEALTH PLATFORM &bull; PROPRIETARY ALGORITHMS</span>
-      </div>
-
-      <div class="footer-right">
-        <span>KOLLS AUTOTRONICS CORP &copy; 2026. ALL RIGHTS RESERVED.</span>
-      </div>
-    </footer>
-
+    <!-- TOAST NOTIFICATION CONTAINER (TOP RIGHT CORNER) -->
+    <div id="fm-toast-container"></div>
   </div>
 
-  <!-- Application Logic -->
+
+  <!-- ========================================================================= -->
+  <!-- SCREEN 3: DRIVER SOFTWARE APP (IN-CAB INTELLIGENCE)                       -->
+  <!-- ========================================================================= -->
+  <div id="driver-view" class="view-screen">
+    
+    <!-- DRIVER DESKTOP / MOBILE CONTAINER WRAPPER -->
+    <div class="driver-layout-wrapper" id="driver-app-frame">
+      
+      <!-- Driver Top Header -->
+      <header class="driver-header">
+        <div class="driver-header-brand">
+          <div class="d-logo"><i class="fa-solid fa-car-tunnel"></i></div>
+          <div>
+            <h2>KOLLS <span class="text-cyan">PILOT</span></h2>
+            <p id="driver-active-vehicle">2024 Peterbilt 579 UltraLoft (Unit #402)</p>
+          </div>
+        </div>
+
+        <div class="driver-header-tools">
+          <button class="btn-tool-pill" onclick="openGarageModal()" title="Switch Vehicle Garage">
+            <i class="fa-solid fa-warehouse"></i> Garage (3)
+          </button>
+          <button class="btn-tool-pill" onclick="openReportModal()" title="View Health Certificate">
+            <i class="fa-solid fa-certificate"></i> Audit Cert
+          </button>
+          <button class="btn-tool-pill" onclick="togglePresentationMode()" title="Toggle Phone / Desktop Presentation Mode">
+            <i class="fa-solid fa-mobile-screen"></i> <span id="pres-mode-label">Phone Frame</span>
+          </button>
+          <button class="btn-role-swap" onclick="switchToFleetView()" title="Back to Fleet Dispatch">
+            <i class="fa-solid fa-satellite-dish"></i> Fleet Dispatch
+          </button>
+          <button class="btn-icon text-red" onclick="switchRoleToLogin()" title="Sign Out">
+            <i class="fa-solid fa-power-off"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- DRIVER MAIN SCREEN PANELS CONTAINER -->
+      <div class="driver-body-container">
+
+        <!-- TAB A: HEALTH OVERVIEW & REAL-TIME MONITORING -->
+        <div id="driver-tab-health" class="driver-sub-screen active-sub-screen">
+          <!-- Circular Health Gauge Card -->
+          <div class="d-card health-score-card">
+            <div class="gauge-dial-container">
+              <svg class="circular-chart" viewBox="0 0 36 36">
+                <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path class="circle-fill" id="driver-health-gauge" stroke-dasharray="87, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <text x="18" y="20.35" class="circle-text" id="driver-health-number">87</text>
+                <text x="18" y="26" class="circle-subtext">HEALTH RATING</text>
+              </svg>
+            </div>
+            
+            <div class="health-meta-details">
+              <div class="h-badge-row">
+                <span class="badge-status-green" id="driver-health-pill"><i class="fa-solid fa-shield-heart"></i> VEHICLE CONDITION: STABLE</span>
+                <span class="text-muted text-xs">AI Confidence 99.1%</span>
+              </div>
+              <p class="health-advice-snippet">Powertrain and braking operate within nominal spec. Minor alternator bearing thermal rise detected; scheduled proactive inspection recommended within 450 km.</p>
+              
+              <div class="health-trip-pills">
+                <span><i class="fa-solid fa-route"></i> Odometer: 142,880 KM</span>
+                <span><i class="fa-solid fa-gas-pump"></i> Range: 740 KM</span>
+                <span><i class="fa-solid fa-shield-virus"></i> Active DTCs: 0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4 Subsystem Health Cards (2x2 Grid) -->
+          <div class="d-grid-2x2">
+            <div class="d-subsystem-card">
+              <div class="sub-icon text-cyan"><i class="fa-solid fa-gears"></i></div>
+              <div class="sub-info">
+                <div class="sub-title-row">
+                  <span>POWERTRAIN & COMBUSTION</span>
+                  <strong class="text-green" id="sub-power-pct">95%</strong>
+                </div>
+                <div class="progress-track"><div class="progress-fill fill-green" id="sub-power-bar" style="width: 95%"></div></div>
+                <span class="sub-footnote">Combustion balance optimal • 0 Misfires</span>
+              </div>
+            </div>
+
+            <div class="d-subsystem-card">
+              <div class="sub-icon text-yellow"><i class="fa-solid fa-temperature-arrow-up"></i></div>
+              <div class="sub-info">
+                <div class="sub-title-row">
+                  <span>THERMAL MANAGEMENT</span>
+                  <strong class="text-yellow" id="sub-therm-pct">78%</strong>
+                </div>
+                <div class="progress-track"><div class="progress-fill fill-yellow" id="sub-therm-bar" style="width: 78%"></div></div>
+                <span class="sub-footnote">Coolant 198°F • Fan Duty Cycle 15%</span>
+              </div>
+            </div>
+
+            <div class="d-subsystem-card">
+              <div class="sub-icon text-green"><i class="fa-solid fa-battery-three-quarters"></i></div>
+              <div class="sub-info">
+                <div class="sub-title-row">
+                  <span>ELECTRICAL SYSTEM</span>
+                  <strong class="text-green" id="sub-elec-pct">92%</strong>
+                </div>
+                <div class="progress-track"><div class="progress-fill fill-green" id="sub-elec-bar" style="width: 92%"></div></div>
+                <span class="sub-footnote">13.8V Bus • Cranking Health 880 CCA</span>
+              </div>
+            </div>
+
+            <div class="d-subsystem-card">
+              <div class="sub-icon text-cyan"><i class="fa-solid fa-circle-dot"></i></div>
+              <div class="sub-info">
+                <div class="sub-title-row">
+                  <span>BRAKES & TIRES</span>
+                  <strong class="text-green" id="sub-brake-pct">84%</strong>
+                </div>
+                <div class="progress-track"><div class="progress-fill fill-green" id="sub-brake-bar" style="width: 84%"></div></div>
+                <span class="sub-footnote">Front Pads 6.8mm • TPMS 105 PSI Avg</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Sensor Counters Strip -->
+          <div class="sensor-counters-ribbon">
+            <div class="counter-box">
+              <span class="c-label"><i class="fa-solid fa-temperature-half"></i> ENGINE TEMP</span>
+              <span class="c-val font-mono" id="driver-sens-temp">88°C</span>
+              <span class="c-sub">Normal: 82-95°C</span>
+            </div>
+            <div class="counter-box">
+              <span class="c-label"><i class="fa-solid fa-gauge"></i> ROAD SPEED</span>
+              <span class="c-val font-mono" id="driver-sens-speed">64 MPH</span>
+              <span class="c-sub">Cruise Active</span>
+            </div>
+            <div class="counter-box">
+              <span class="c-label"><i class="fa-solid fa-weight-hanging"></i> ENGINE LOAD</span>
+              <span class="c-val font-mono" id="driver-sens-load">42%</span>
+              <span class="c-sub">Cruising Strain</span>
+            </div>
+            <div class="counter-box">
+              <span class="c-label"><i class="fa-solid fa-fire"></i> MISFIRE COUNT</span>
+              <span class="c-val font-mono text-green" id="driver-sens-misfire">0</span>
+              <span class="c-sub">Per 1,000 Revs</span>
+            </div>
+          </div>
+
+          <!-- Smart 4-Corner Tire System (Car TPMS View) -->
+          <div class="d-card tpms-driver-card">
+            <h4 class="card-inner-title"><i class="fa-solid fa-car-side"></i> Smart 4-Wheel In-Cab TPMS & Tread Geometry</h4>
+            <div class="car-tpms-diagram">
+              <div class="car-wheel fl">
+                <span class="wheel-pos">FRONT LEFT</span>
+                <span class="wheel-psi" id="fl-psi">35 PSI</span>
+                <span class="wheel-temp" id="fl-temp">32°C • 7.2mm</span>
+              </div>
+              <div class="car-body-silhouette">
+                <div class="chassis-core"></div>
+              </div>
+              <div class="car-wheel fr">
+                <span class="wheel-pos">FRONT RIGHT</span>
+                <span class="wheel-psi" id="fr-psi">35 PSI</span>
+                <span class="wheel-temp" id="fr-temp">33°C • 7.1mm</span>
+              </div>
+              <div class="car-wheel rl">
+                <span class="wheel-pos">REAR LEFT</span>
+                <span class="wheel-psi" id="rl-psi">34 PSI</span>
+                <span class="wheel-temp" id="rl-temp">30°C • 6.8mm</span>
+              </div>
+              <div class="car-wheel rr">
+                <span class="wheel-pos">REAR RIGHT</span>
+                <span class="wheel-psi" id="rr-psi">34 PSI</span>
+                <span class="wheel-temp" id="rr-temp">31°C • 6.9mm</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB B: SMART ALERTS & FINANCIAL AVOIDANCE ENGINE -->
+        <div id="driver-tab-alerts" class="driver-sub-screen">
+          <div class="section-lead-banner">
+            <div>
+              <h3><i class="fa-solid fa-piggy-bank text-green"></i> Smart Alerts & Financial Avoidance Engine</h3>
+              <p>Catch mechanical degradation early. Fix parts before secondary engine damage multiplies costs.</p>
+            </div>
+            <div class="total-saved-pill">
+              <span>Potential Net Savings:</span>
+              <strong class="text-green">+$3,350.00</strong>
+            </div>
+          </div>
+
+          <!-- Alert Cards Container -->
+          <div class="driver-alerts-list" id="driver-alerts-container">
+            
+            <!-- Sample Card 1: Thermostat -->
+            <div class="smart-alert-card border-yellow" id="alert-card-1">
+              <div class="alert-card-head">
+                <div class="alert-icon-box text-yellow"><i class="fa-solid fa-temperature-arrow-up"></i></div>
+                <div class="alert-head-text">
+                  <h4>Coolant Temperature Drift (+6°C Above Norm)</h4>
+                  <span class="param-compare font-mono">Current: 104°C | Max Safe Limit: 98°C</span>
+                </div>
+                <span class="horizon-badge"><i class="fa-solid fa-hourglass-half"></i> Horizon: ~45 km / 30 mins</span>
+              </div>
+              
+              <div class="financial-breakdown-box">
+                <div class="cost-col delayed">
+                  <span class="cost-title"><i class="fa-solid fa-circle-xmark"></i> If Repair Is Delayed:</span>
+                  <span class="cost-val text-red">$1,850.00</span>
+                  <p class="cost-detail">Blown head gasket, warped cylinder head, cooling boil-over on highway.</p>
+                </div>
+                <div class="cost-col proactive">
+                  <span class="cost-title"><i class="fa-solid fa-circle-check"></i> Proactive Fix Today:</span>
+                  <span class="cost-val text-green">$20.00</span>
+                  <p class="cost-detail">Replace sticky coolant thermostat & top off 50/50 coolant mix.</p>
+                </div>
+                <div class="cost-col net-savings">
+                  <span class="cost-title"><i class="fa-solid fa-award"></i> Net Avoidance Savings:</span>
+                  <span class="cost-val text-cyan">+$1,830.00</span>
+                  <button class="btn-resolve-fix" onclick="simulateFixAlert(1)">
+                    <i class="fa-solid fa-wrench"></i> 1-Click Simulate Fix
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sample Card 2: Brake Pads -->
+            <div class="smart-alert-card border-cyan" id="alert-card-2">
+              <div class="alert-card-head">
+                <div class="alert-icon-box text-cyan"><i class="fa-solid fa-circle-notch"></i></div>
+                <div class="alert-head-text">
+                  <h4>Front Brake Pad Wear Threshold (2.7mm Remaining)</h4>
+                  <span class="param-compare font-mono">Current: 2.7mm | Minimum Rotor Contact: 1.5mm</span>
+                </div>
+                <span class="horizon-badge"><i class="fa-solid fa-road"></i> Horizon: 1,200 km remaining</span>
+              </div>
+              
+              <div class="financial-breakdown-box">
+                <div class="cost-col delayed">
+                  <span class="cost-title"><i class="fa-solid fa-circle-xmark"></i> If Delayed Past 1,200km:</span>
+                  <span class="cost-val text-red">$650.00</span>
+                  <p class="cost-detail">Metal pad backing plate gouges dual front cast-iron rotors.</p>
+                </div>
+                <div class="cost-col proactive">
+                  <span class="cost-title"><i class="fa-solid fa-circle-check"></i> Proactive Ceramic Pads:</span>
+                  <span class="cost-val text-green">$180.00</span>
+                  <p class="cost-detail">Simple pad replacement without needing expensive new rotors.</p>
+                </div>
+                <div class="cost-col net-savings">
+                  <span class="cost-title"><i class="fa-solid fa-award"></i> Net Avoidance Savings:</span>
+                  <span class="cost-val text-cyan">+$470.00</span>
+                  <button class="btn-resolve-fix" onclick="simulateFixAlert(2)">
+                    <i class="fa-solid fa-wrench"></i> 1-Click Simulate Fix
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sample Card 3: Fuel Trim Drift -->
+            <div class="smart-alert-card border-yellow" id="alert-card-3">
+              <div class="alert-card-head">
+                <div class="alert-icon-box text-yellow"><i class="fa-solid fa-wind"></i></div>
+                <div class="alert-head-text">
+                  <h4>Intake Vacuum Leak — Long-Term Fuel Trim +14.2%</h4>
+                  <span class="param-compare font-mono">Current LTFT: +14.2% | Baseline: 0.0% (±5%)</span>
+                </div>
+                <span class="horizon-badge"><i class="fa-solid fa-gas-pump"></i> Fuel Penalty: +8% Burn</span>
+              </div>
+              
+              <div class="financial-breakdown-box">
+                <div class="cost-col delayed">
+                  <span class="cost-title"><i class="fa-solid fa-circle-xmark"></i> If Left Uncorrected:</span>
+                  <span class="cost-val text-red">$1,100.00</span>
+                  <p class="cost-detail">Fouled catalytic converter and extra $850/year in wasted diesel/gas.</p>
+                </div>
+                <div class="cost-col proactive">
+                  <span class="cost-title"><i class="fa-solid fa-circle-check"></i> Proactive Vacuum Seal:</span>
+                  <span class="cost-val text-green">$50.00</span>
+                  <p class="cost-detail">Replace cracked PCV vacuum elbow hose in 15 minutes.</p>
+                </div>
+                <div class="cost-col net-savings">
+                  <span class="cost-title"><i class="fa-solid fa-award"></i> Net Avoidance Savings:</span>
+                  <span class="cost-val text-cyan">+$1,050.00</span>
+                  <button class="btn-resolve-fix" onclick="simulateFixAlert(3)">
+                    <i class="fa-solid fa-wrench"></i> 1-Click Simulate Fix
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- TAB C: AI PREDICTIVE MAINTENANCE (DRIVING STYLE WEAR SIMULATOR) -->
+        <div id="driver-tab-maintenance" class="driver-sub-screen">
+          <div class="d-card">
+            <h3 class="card-inner-title"><i class="fa-solid fa-sliders"></i> Driving Style Wear Simulator</h3>
+            <p class="text-sm text-muted">Select how this vehicle is driven to watch consumable component wear timelines adjust in real-time:</p>
+            
+            <!-- Driving Style Selector Buttons -->
+            <div class="style-selector-bar">
+              <button class="style-btn" id="style-severe" onclick="setDrivingStyle('severe')">
+                <i class="fa-solid fa-stopwatch-20"></i>
+                <div class="s-text">
+                  <strong>Severe Stop-and-Go</strong>
+                  <span>High idling & short hops (1.8x wear)</span>
+                </div>
+              </button>
+              
+              <button class="style-btn" id="style-urban" onclick="setDrivingStyle('urban')">
+                <i class="fa-solid fa-city"></i>
+                <div class="s-text">
+                  <strong>Urban Aggressive</strong>
+                  <span>Hard acceleration & brake hits (1.3x wear)</span>
+                </div>
+              </button>
+
+              <button class="style-btn active" id="style-highway" onclick="setDrivingStyle('highway')">
+                <i class="fa-solid fa-road"></i>
+                <div class="s-text">
+                  <strong>Highway Eco Cruise</strong>
+                  <span>Smooth sustained speeds (Max Life)</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Component Wear Countdown Cards Grid -->
+          <div class="consumables-grid" id="consumables-container">
+            <!-- Injected via JavaScript -->
+          </div>
+        </div>
+
+        <!-- TAB D: AI DIAGNOSTIC COPILOT (VIRTUAL MASTER MECHANIC CHAT) -->
+        <div id="driver-tab-copilot" class="driver-sub-screen">
+          <div class="copilot-container">
+            <!-- Copilot Chat Header -->
+            <div class="copilot-header">
+              <div class="copilot-avatar">
+                <i class="fa-solid fa-robot"></i>
+              </div>
+              <div class="copilot-meta">
+                <h4>KOLLS VIRTUAL MASTER MECHANIC</h4>
+                <span class="text-xs text-green"><i class="fa-solid fa-circle text-xs"></i> Grounded in live CAN Bus PID Telemetry • Offline Brain Backup Active</span>
+              </div>
+            </div>
+
+            <!-- Messages Stream Area -->
+            <div class="copilot-messages" id="copilot-msg-stream">
+              <!-- Initial Welcome Message from AI -->
+              <div class="chat-msg ai-msg">
+                <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
+                <div class="msg-content">
+                  <p>Hello! I am your <strong>Kolls AI Diagnostic Copilot</strong>. I'm actively monitoring your vehicle's CAN bus stream. Everything is looking solid today, though I'm keeping an eye on your coolant temperature during slow climbs.</p>
+                  <span class="msg-timestamp">Today at 17:09 UTC</span>
+                </div>
+              </div>
+
+              <!-- Initial Technical Analogy Message -->
+              <div class="chat-msg ai-msg">
+                <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
+                <div class="msg-content">
+                  <p>💡 <strong>Mechanical Analogy:</strong> Think of your engine's cooling thermostat like the thermostat valve on a home air-conditioner. Right now it opens just slightly sluggishly. If we flush it soon, it costs $20, but if we let it seize shut, it's like leaving your oven on high with the door closed until the metal warps.</p>
+                  <span class="msg-timestamp">Today at 17:09 UTC</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Question Chips -->
+            <div class="quick-question-row">
+              <button class="chip-btn" onclick="askCopilot('Why is my engine running at 104°C?')">Why is engine hot?</button>
+              <button class="chip-btn" onclick="askCopilot('How long can I safely drive on 15% brake pads?')">How long on 15% pads?</button>
+              <button class="chip-btn" onclick="askCopilot('What does a high Long-Term Fuel Trim mean?')">What is Fuel Trim drift?</button>
+              <button class="chip-btn" onclick="askCopilot('Is my battery alternator charging normally?')">Alternator health check?</button>
+            </div>
+
+            <!-- Input Bar -->
+            <div class="copilot-input-bar">
+              <input type="text" id="copilot-input" placeholder="Ask your master mechanic anything about your car..." onkeypress="handleCopilotKey(event)">
+              <button class="btn-copilot-send" onclick="sendCopilotMessage()">
+                <i class="fa-solid fa-paper-plane"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB E: DRIVING LONGEVITY OPTIMIZER (SAVING MONEY ON THE ROAD) -->
+        <div id="driver-tab-optimizer" class="driver-sub-screen">
+          <div class="d-card optimizer-hero-card">
+            <span class="hero-sub">ESTIMATED PROACTIVE DRIVING DIVIDEND</span>
+            <h1 class="hero-savings-num text-green" id="driver-annual-savings">+$2,960.00 / yr</h1>
+            <p class="hero-desc">Calculated by correlating real-time accelerometer, brake pressure, and throttle position data against long-term maintenance costs.</p>
+          </div>
+
+          <!-- Driving Habit Scoring Gauges -->
+          <div class="d-grid-2x2">
+            <div class="d-card habit-card">
+              <div class="habit-header">
+                <span>ACCELERATION SMOOTHNESS</span>
+                <strong class="text-green">88 / 100</strong>
+              </div>
+              <div class="progress-track"><div class="progress-fill fill-green" style="width: 88%"></div></div>
+              <p class="habit-tip">Gentle roll-ons save up to 12% on fuel consumption.</p>
+            </div>
+
+            <div class="d-card habit-card">
+              <div class="habit-header">
+                <span>BRAKING HARSHNESS</span>
+                <strong class="text-yellow">72 / 100</strong>
+              </div>
+              <div class="progress-track"><div class="progress-fill fill-yellow" style="width: 72%"></div></div>
+              <p class="habit-tip">Earlier coasting avoids brake pad glazing and rotor warpage.</p>
+            </div>
+
+            <div class="d-card habit-card">
+              <div class="habit-header">
+                <span>IDLE RUNTIME MANAGEMENT</span>
+                <strong class="text-green">95 / 100</strong>
+              </div>
+              <div class="progress-track"><div class="progress-fill fill-green" style="width: 95%"></div></div>
+              <p class="habit-tip">Under 8 mins/day idle prevents fuel washdown in cylinder rings.</p>
+            </div>
+
+            <div class="d-card habit-card">
+              <div class="habit-header">
+                <span>HIGHWAY WARMUP RATIO</span>
+                <strong class="text-green">81 / 100</strong>
+              </div>
+              <div class="progress-track"><div class="progress-fill fill-green" style="width: 81%"></div></div>
+              <p class="habit-tip">Regular 30+ min drives burn off moisture trapped in motor oil.</p>
+            </div>
+          </div>
+
+          <!-- Actionable Mechanical Playbook Cards -->
+          <div class="d-card">
+            <h4 class="card-inner-title"><i class="fa-solid fa-book-bookmark"></i> Actionable Mechanical Longevity Playbook</h4>
+            
+            <div class="playbook-list">
+              <div class="playbook-item">
+                <div class="pb-icon text-cyan"><i class="fa-solid fa-car-on"></i></div>
+                <div class="pb-text">
+                  <strong>Coasting to Stoplights & Exits (Saves ~$450 / yr)</strong>
+                  <p>Releasing throttle 100 meters earlier lets engine compression brake the car, extending brake friction lining life by up to 35%.</p>
+                </div>
+              </div>
+
+              <div class="playbook-item">
+                <div class="pb-icon text-yellow"><i class="fa-solid fa-fan"></i></div>
+                <div class="pb-text">
+                  <strong>Turbocharger Cool-Down Idle (Saves ~$1,850 on Turbo Housing)</strong>
+                  <p>Idling for 45 seconds after heavy highway hauling keeps oil circulating while turbine wheels spin down from 150,000 RPM, preventing oil coking in bearings.</p>
+                </div>
+              </div>
+
+              <div class="playbook-item">
+                <div class="pb-icon text-green"><i class="fa-solid fa-fire-burner"></i></div>
+                <div class="pb-text">
+                  <strong>Weekly Sustained Highway Cruise (Saves ~$280 on Premature Oil Degradation)</strong>
+                  <p>Driving on the highway for 30 consecutive minutes brings oil to 100°C, fully evaporating unburnt fuel and condensation trapped inside the crankcase.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB F: LIVE VEHICLE DATA STREAM (UNDER THE HOOD CAN BUS PIDs) -->
+        <div id="driver-tab-livedata" class="driver-sub-screen">
+          <div class="d-card">
+            <div class="section-header-flex">
+              <h4 class="card-inner-title"><i class="fa-solid fa-microchip"></i> Live CAN Bus Sensor Trends (50Hz Ingestion)</h4>
+              <span class="tpms-legend font-mono text-cyan"><i class="fa-solid fa-satellite"></i> TWAI/ISO-11898 STREAM ACTIVE</span>
+            </div>
+            
+            <!-- Live Charts Grid -->
+            <div class="live-charts-grid">
+              <div class="chart-box">
+                <span class="chart-box-title">Coolant Temperature Drift (°C)</span>
+                <canvas id="driver-chart-coolant" height="110"></canvas>
+              </div>
+              <div class="chart-box">
+                <span class="chart-box-title">Engine Speed Curve (RPM)</span>
+                <canvas id="driver-chart-rpm" height="110"></canvas>
+              </div>
+              <div class="chart-box">
+                <span class="chart-box-title">System Bus Voltage & Alternator Ripple (V)</span>
+                <canvas id="driver-chart-voltage" height="110"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Raw Sensor Inspection Table -->
+          <div class="d-card">
+            <h4 class="card-inner-title"><i class="fa-solid fa-table-list"></i> Raw Diagnostic Sensor Inspection (OBD-II Mode 01)</h4>
+            <div class="table-responsive">
+              <table class="pid-table">
+                <thead>
+                  <tr>
+                    <th>PID</th>
+                    <th>Standard Channel</th>
+                    <th>Hex Request</th>
+                    <th>Real-Time Value</th>
+                    <th>Physical Unit</th>
+                    <th>Safety Tolerance</th>
+                  </tr>
+                </thead>
+                <tbody id="pid-table-body">
+                  <!-- Dynamically populated rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- DRIVER BOTTOM NAVIGATION BAR (IN-CAB TOUCH / SMARTPHONE) -->
+      <nav class="driver-nav-bar" id="driver-nav">
+        <button class="d-nav-item active" onclick="switchDriverScreen('health')">
+          <i class="fa-solid fa-heart-pulse"></i>
+          <span>Health</span>
+        </button>
+        <button class="d-nav-item" onclick="switchDriverScreen('alerts')">
+          <i class="fa-solid fa-bell"></i>
+          <span>Alerts (3)</span>
+        </button>
+        <button class="d-nav-item" onclick="switchDriverScreen('maintenance')">
+          <i class="fa-solid fa-screwdriver-wrench"></i>
+          <span>Predict</span>
+        </button>
+        <button class="d-nav-item" onclick="switchDriverScreen('copilot')">
+          <i class="fa-solid fa-robot"></i>
+          <span>AI Copilot</span>
+        </button>
+        <button class="d-nav-item" onclick="switchDriverScreen('optimizer')">
+          <i class="fa-solid fa-piggy-bank"></i>
+          <span>Savings</span>
+        </button>
+        <button class="d-nav-item" onclick="switchDriverScreen('livedata')">
+          <i class="fa-solid fa-terminal"></i>
+          <span>Live PIDs</span>
+        </button>
+      </nav>
+
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 1: SIMULATION LAB (TESTING & INVESTOR DEMO FAULT INJECTOR)           -->
+  <!-- ========================================================================= -->
+  <div id="sim-lab-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3><i class="fa-solid fa-flask text-cyan"></i> Operational Simulation Lab</h3>
+        <button class="btn-close-modal" onclick="closeSimLabModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p class="modal-desc">Inject simulated mechanical anomalies into the live TWAI/CAN bus stream to observe instant AI failure horizons and triage reprioritization.</p>
+      
+      <div class="sim-buttons-grid">
+        <button class="sim-btn btn-overheat" onclick="injectSimAnomaly('overheat')">
+          <i class="fa-solid fa-fire"></i>
+          <div>
+            <strong>Coolant Thermal Runaway (116°C)</strong>
+            <span>Trips urgent cooling fan fault</span>
+          </div>
+        </button>
+
+        <button class="sim-btn btn-bearing" onclick="injectSimAnomaly('bearing')">
+          <i class="fa-solid fa-burst"></i>
+          <div>
+            <strong>Alternator Bearing 120Hz Spike</strong>
+            <span>Generates 3.5-hr RUL emergency</span>
+          </div>
+        </button>
+
+        <button class="sim-btn btn-misfire" onclick="injectSimAnomaly('misfire')">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <div>
+            <strong>Cylinder #3 Combustion Misfire</strong>
+            <span>P0303 unburnt fuel trim anomaly</span>
+          </div>
+        </button>
+
+        <button class="sim-btn btn-voltage" onclick="injectSimAnomaly('voltage')">
+          <i class="fa-solid fa-car-battery"></i>
+          <div>
+            <strong>Alternator Diode Ripple / Sag (11.2V)</strong>
+            <span>Trips low battery bus emergency</span>
+          </div>
+        </button>
+
+        <button class="sim-btn btn-tire" onclick="injectSimAnomaly('tire')">
+          <i class="fa-solid fa-circle-radiation"></i>
+          <div>
+            <strong>Trailer Steer Tire Blowout (18 PSI)</strong>
+            <span>Triggers immediate roadside hazard</span>
+          </div>
+        </button>
+
+        <button class="sim-btn btn-tamper" onclick="injectSimAnomaly('tamper')">
+          <i class="fa-solid fa-shield-halved"></i>
+          <div>
+            <strong>Anti-Tamper OBD-II Unplug Event</strong>
+            <span>18650 Battery failover siren</span>
+          </div>
+        </button>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" onclick="resetSimToNominal()">
+          <i class="fa-solid fa-rotate-left"></i> RESTORE ALL SYSTEMS TO NOMINAL
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 2: CONNECTED MULTI-CAR GARAGE                                      -->
+  <!-- ========================================================================= -->
+  <div id="garage-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3><i class="fa-solid fa-warehouse text-cyan"></i> Connected Multi-Car Garage</h3>
+        <button class="btn-close-modal" onclick="closeGarageModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p class="modal-desc">Switch active telematics profiles across your fleet or personal garage vehicles:</p>
+      
+      <div class="garage-grid">
+        <div class="garage-vehicle-card active" onclick="selectGarageVehicle('peterbilt')">
+          <div class="g-car-header">
+            <h4>2024 Peterbilt 579 UltraLoft</h4>
+            <span class="badge-status-green">ACTIVE PROFILE</span>
+          </div>
+          <p class="font-mono text-muted">VIN: 1FUJBBC97NL62881 • Class 8 Semi</p>
+          <div class="g-score-row">
+            <span>Health Rating:</span>
+            <strong class="text-green">87 / 100</strong>
+          </div>
+        </div>
+
+        <div class="garage-vehicle-card" onclick="selectGarageVehicle('ford')">
+          <div class="g-car-header">
+            <h4>2023 Ford F-150 Lightning EV</h4>
+            <span class="badge-status-cyan">STANDBY</span>
+          </div>
+          <p class="font-mono text-muted">VIN: 1FT6W1EV4PW19820 • Dual-Motor</p>
+          <div class="g-score-row">
+            <span>Health Rating:</span>
+            <strong class="text-green">96 / 100</strong>
+          </div>
+        </div>
+
+        <div class="garage-vehicle-card" onclick="selectGarageVehicle('bmw')">
+          <div class="g-car-header">
+            <h4>2022 BMW 330i xDrive Sedan</h4>
+            <span class="badge-status-yellow">NEEDS SERVICE</span>
+          </div>
+          <p class="font-mono text-muted">VIN: WBA5R7C58NF62109 • 2.0L Turbo</p>
+          <div class="g-score-row">
+            <span>Health Rating:</span>
+            <strong class="text-yellow">74 / 100</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 3: DIAGNOSTIC HEALTH AUDIT CERTIFICATE                             -->
+  <!-- ========================================================================= -->
+  <div id="report-modal" class="modal-backdrop">
+    <div class="modal-card print-report-card">
+      <div class="modal-head">
+        <h3><i class="fa-solid fa-certificate text-green"></i> Official Diagnostic Health Audit Certificate</h3>
+        <button class="btn-close-modal" onclick="closeReportModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="certificate-printable" id="printable-certificate">
+        <div class="cert-border">
+          <div class="cert-header">
+            <div class="cert-logo">⚡ KOLLS AUTOTRONICS</div>
+            <div class="cert-stamp">CERTIFIED VEHICLE AUDIT</div>
+          </div>
+
+          <div class="cert-body">
+            <h2>VEHICLE HEALTH VERIFICATION REPORT</h2>
+            <p>This document certifies that the vehicle designated below underwent an exhaustive 50Hz rotordynamic and electronic diagnostic sweep via the Kolls TWAI edge interface.</p>
+            
+            <div class="cert-data-grid">
+              <div><strong>Vehicle:</strong> <span id="cert-vehicle-name">2024 Peterbilt 579 UltraLoft</span></div>
+              <div><strong>VIN:</strong> <span class="font-mono" id="cert-vin">1FUJBBC97NL62881</span></div>
+              <div><strong>Overall Health Score:</strong> <span class="text-green"><strong>87 / 100 (Optimal)</strong></span></div>
+              <div><strong>Date of Inspection:</strong> <span id="cert-date">October 17, 2026</span></div>
+              <div><strong>Active DTC Codes:</strong> <span class="text-green">0 Pending / 0 Stored</span></div>
+              <div><strong>Validation Hash:</strong> <span class="font-mono text-cyan" id="cert-hash">0x8F91A-2026-KOLLS-VERIFIED</span></div>
+            </div>
+
+            <div class="cert-subsystem-summary">
+              <div class="cert-sub-chip">Powertrain: <strong>95%</strong></div>
+              <div class="cert-sub-chip">Cooling: <strong>78%</strong></div>
+              <div class="cert-sub-chip">Electrical: <strong>92%</strong></div>
+              <div class="cert-sub-chip">Brakes: <strong>84%</strong></div>
+            </div>
+
+            <div class="cert-signature-row">
+              <div class="sig-block">
+                <span class="sig-line">Kolls Neural Diagnostic Core v2.4</span>
+                <span class="sig-title">Automated AI Inspector</span>
+              </div>
+              <div class="sig-qr">
+                <i class="fa-solid fa-qrcode fa-3x"></i>
+                <span>Scan to Verify</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" onclick="window.print()">
+          <i class="fa-solid fa-print"></i> PRINT OFFICIAL CERTIFICATE
+        </button>
+        <button class="btn-secondary" onclick="closeReportModal()">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 4: 2-MINUTE LIVE INSPECT (OSCILLOSCOPE WAVEFORM SIMULATOR)         -->
+  <!-- ========================================================================= -->
+  <div id="inspect-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3><i class="fa-solid fa-wave-square text-cyan"></i> Cellular High-Speed Live Diagnostic Stream (02:00)</h3>
+        <button class="btn-close-modal" onclick="closeLiveInspectModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="inspect-timer-banner">
+        <span>Active High-Frequency CAN Sampling Window:</span>
+        <strong class="font-mono text-cyan" id="inspect-countdown">02:00</strong>
+      </div>
+      
+      <div class="oscilloscope-container">
+        <canvas id="oscilloscope-canvas" height="180"></canvas>
+      </div>
+      <p class="text-xs text-muted">Sampling raw ECU analog bus ripple at 200 samples/sec over encrypted cellular link. Waveform stability verifies voltage regulator clamping performance.</p>
+    </div>
+  </div>
+
+
+  <!-- ========================================================================= -->
+  <!-- MODAL 5: SMS DRIVER DISPATCH DIALOG                                      -->
+  <!-- ========================================================================= -->
+  <div id="sms-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3><i class="fa-solid fa-comment-sms text-green"></i> In-Cab Driver Safe-Harbor Dispatch</h3>
+        <button class="btn-close-modal" onclick="closeSMSModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p class="modal-desc">Send immediate routing guidance to the driver's in-cab display terminal:</p>
+
+      <div class="sms-templates">
+        <span class="text-xs text-muted">1-Click Dispatch Templates:</span>
+        <div class="template-btns">
+          <button class="btn-template" onclick="fillSMSTemplate(1)">Reroute to Des Moines Hub - Bay 3 Ready</button>
+          <button class="btn-template" onclick="fillSMSTemplate(2)">Reduce Speed to 55 MPH - Bearing Thermal Watch</button>
+          <button class="btn-template" onclick="fillSMSTemplate(3)">Safe Harbor Pull-Over at Next Truck Stop (Exit 182)</button>
+        </div>
+      </div>
+
+      <div class="input-group" style="margin-top: 15px;">
+        <label>Message Content (will flash on in-cab display):</label>
+        <textarea id="sms-text-input" rows="3" style="width: 100%; background: #111827; border: 1px solid #2a3041; border-radius: 8px; color: #fff; padding: 10px; font-family: monospace;">REROUTE ADVISORY: Alternator bearing alert. Divert to Des Moines Logistics Hub (Exit 137). Bay 3 and Master Tech Marcus Vance are pre-staged with replacement parts.</textarea>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" onclick="sendSMSToDriver()">
+          <i class="fa-solid fa-paper-plane"></i> TRANSMIT IN-CAB ADVISORY
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Scripts -->
   <script src="app.js"></script>
 </body>
 </html>

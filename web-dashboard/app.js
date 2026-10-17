@@ -1,1427 +1,1353 @@
 /**
- * ============================================================================
- * KOLLS AUTOTRONICS — AI VEHICLE HEALTH MONITORING SYSTEM
- * Core Application Logic, MQTT Stream Ingestion, Gauge Physics & Chart.js Engine
- * ============================================================================
- * 
- * Target Telemetry Payload:
- * {
- *   "rpm": 2400,
- *   "coolant_temp": 85,
- *   "oil_temp": 92,
- *   "battery_voltage": 13.8,
- *   "engine_load": 45,
- *   "stft": 2.3,
- *   "ltft": 4.1,
- *   "intake_air_temp": 35,
- *   "status": "NOMINAL",
- *   "vehicle_id": "KA-TRUCK-001",
- *   "timestamp": 1697000000
- * }
+ * ==============================================================================
+ * KOLLS AUTOTRONICS — DUAL-ROLE FLEET & DRIVER INTELLIGENCE PLATFORM
+ * Core Engine: Geospatial Fleet Dispatcher, In-Cab Prognostics & AI Copilot
+ * ==============================================================================
  */
 
-'use strict';
-
-// ============================================================================
-// 1. GLOBAL STATE & CONFIGURATION
-// ============================================================================
-const CONFIG = {
-  mqtt: {
-    // Primary public broker with secure WebSockets
-    brokerUrl: 'wss://broker.hivemq.com:8884/mqtt',
-    // Fallback alternative broker
-    fallbackBrokerUrl: 'wss://test.mosquitto.org:8081/mqtt',
-    topic: 'kolls/vehicle/telemetry',
-    clientId: 'kolls_telemetry_' + Math.random().toString(16).substring(2, 9),
-    connectTimeoutMs: 5000,
-    keepalive: 60
-  },
-  charts: {
-    maxThermalPoints: 30,
-    maxFuelTrimPoints: 50,
-    stftThreshold: 10.0,
-    ltftThreshold: 10.0
-  },
-  feed: {
-    maxEntries: 50
-  },
-  gaugeConstants: {
-    rpmMax: 8000,
-    // Semi-circle arc circumference: pi * 105 ~ 329.87
-    rpmArcCircumference: 330,
-    loadMax: 100,
-    voltMin: 10.0,
-    voltMax: 15.0
-  }
-};
-
-const STATE = {
-  isMqttConnected: false,
-  isSimulationMode: false,
-  mqttClient: null,
-  mqttTimeoutTimer: null,
-  simulationInterval: null,
-  audioEnabled: false,
-  autoScrollEnabled: true,
-  packetsReceived: 0,
-  packetTimes: [],
-  maxRpmObserved: 0,
+// Global Application State
+const APP = {
+  currentRole: 'fleet',         // 'fleet' | 'driver'
+  activeFleetDivision: 'midwest',
+  currentDriverScreen: 'health',
+  selectedTruckId: '402',
+  inspectorOpen: false,
+  drivingStyle: 'highway',       // 'severe' | 'urban' | 'highway'
+  audioEnabled: true,
+  isPhoneFrame: false,
+  oscilloscopeInterval: null,
+  oscilloscopeTimer: 120,        // 2 minutes in seconds
+  
+  // Audio Context (Synthesizer Chimes)
   audioCtx: null,
-  
-  // Real-time telemetry buffer
-  telemetry: {
-    rpm: 2400,
-    coolant_temp: 85,
-    oil_temp: 92,
-    battery_voltage: 13.8,
-    engine_load: 45,
-    stft: 2.3,
-    ltft: 4.1,
-    intake_air_temp: 35,
-    status: 'NOMINAL',
-    vehicle_id: 'KA-TRUCK-001',
-    timestamp: Date.now()
+
+  // Map & Markers Reference
+  map: null,
+  markers: {},
+  depotCircles: [],
+  weatherOverlay: null,
+  trafficOverlay: null,
+
+  // Chart Instances
+  charts: {
+    vibration: null,
+    driverCoolant: null,
+    driverRpm: null,
+    driverVoltage: null
   },
 
-  // Simulator Physics State Machine
-  simPhysics: {
-    baseRpm: 2400,
-    gear: 3,
-    speedMph: 45,
-    throttleTarget: 45,
-    simTime: 0,
-    anomalyActive: null,
-    anomalyDuration: 0
-  }
+  // Fleet Asset Registry (8 Detailed Sample Trucks in Midwest I-80 Corridor)
+  trucks: [
+    {
+      id: '402',
+      driver: 'John Doe',
+      phone: '+1 (515) 890-4412',
+      cdl: 'CDL-A #IA-90488214',
+      vin: '1FUJBBC97NL62881',
+      model: '2024 Peterbilt 579 UltraLoft',
+      location: 'I-80 Westbound near Grinnell, IA (MP 182)',
+      lat: 41.7431,
+      lng: -92.7222,
+      speed: 64,
+      heading: '274° WNW',
+      headingDeg: 274,
+      voltage: 13.8,
+      severity: 'critical',
+      rulHours: 3.5,
+      problem: 'Alternator Bearing Failure Imminent',
+      impact: 'Stator lockup in 3.5 hrs; complete bus blackout on I-80.',
+      subsystem: 'Electrical & Charging',
+      subsystemScores: { powertrain: 98, electrical: 42, brakes: 91, transmission: 89 },
+      vibrationFreq: 120, // 120 Hz peak
+      telemetry: { rpm: 1480, coolantF: 198, oilPressPsi: 46, fuelGph: 7.2, defPct: 82, boostPsi: 24.5 },
+      hos: { driveUsed: '5h 18m', driveLimit: '11h 00m', shiftUsed: '6h 45m', shiftLimit: '14h 00m', weeklyUsed: '42h 10m', weeklyLimit: '70h 00m' },
+      safetyScore: 98,
+      tpms: [108, 107, 102, 103, 102, 104, 101, 101, 103, 102, 105, 104, 106, 105, 104, 103, 105, 104],
+      workOrder: {
+        id: 'WO-8902-TR402',
+        hub: 'Des Moines Logistics Hub (Exit 137)',
+        bay: 'Bay 3',
+        tech: 'Marcus Vance (ASE Master)',
+        downtime: '1.5 Hours',
+        status: 'PRE-DISPATCH STAGED'
+      }
+    },
+    {
+      id: '612',
+      driver: 'Sarah Jenkins',
+      phone: '+1 (319) 552-9011',
+      cdl: 'CDL-A #IL-77291034',
+      vin: '2WKDC29X8PM39102',
+      model: '2023 Kenworth T680 Next Gen',
+      location: 'I-80 Eastbound near Iowa City, IA (MP 244)',
+      lat: 41.6611,
+      lng: -91.5302,
+      speed: 62,
+      heading: '94° E',
+      headingDeg: 94,
+      voltage: 14.1,
+      severity: 'critical',
+      rulHours: 1.8,
+      problem: 'Steer Axle Hub Bearing Overheating (+85°C)',
+      impact: 'Bearing thermal seizure risk in 1.8 hrs; steer lockup hazard.',
+      subsystem: 'Brakes & Steer Axle',
+      subsystemScores: { powertrain: 94, electrical: 96, brakes: 38, transmission: 92 },
+      vibrationFreq: 180,
+      telemetry: { rpm: 1520, coolantF: 194, oilPressPsi: 48, fuelGph: 7.6, defPct: 78, boostPsi: 26.0 },
+      hos: { driveUsed: '7h 12m', driveLimit: '11h 00m', shiftUsed: '8h 30m', shiftLimit: '14h 00m', weeklyUsed: '51h 20m', weeklyLimit: '70h 00m' },
+      safetyScore: 94,
+      tpms: [118, 108, 102, 101, 102, 103, 101, 100, 102, 102, 105, 105, 104, 105, 103, 104, 104, 103],
+      workOrder: {
+        id: 'WO-8903-TR612',
+        hub: 'Cedar Rapids Maintenance Hub (Exit 246)',
+        bay: 'Bay 1',
+        tech: 'David Miller',
+        downtime: '2.0 Hours',
+        status: 'READY FOR DISPATCH'
+      }
+    },
+    {
+      id: '108',
+      driver: 'Carlos Ramirez',
+      phone: '+1 (515) 334-1189',
+      cdl: 'CDL-A #MO-44019281',
+      vin: '1FUJBBC93PL19844',
+      model: '2023 Freightliner Cascadia 126',
+      location: 'I-35 Northbound near Ames, IA (MP 113)',
+      lat: 42.0308,
+      lng: -93.6319,
+      speed: 66,
+      heading: '04° N',
+      headingDeg: 4,
+      voltage: 13.9,
+      severity: 'warning',
+      rulHours: 18.5,
+      problem: 'Engine Fuel Trim Drift (+14.2% Lean Spike)',
+      impact: 'Intake vacuum leak causing +8% fuel penalty and hot exhaust.',
+      subsystem: 'Powertrain & Air Intake',
+      subsystemScores: { powertrain: 76, electrical: 94, brakes: 92, transmission: 90 },
+      vibrationFreq: 45,
+      telemetry: { rpm: 1450, coolantF: 204, oilPressPsi: 44, fuelGph: 8.4, defPct: 88, boostPsi: 22.0 },
+      hos: { driveUsed: '3h 40m', driveLimit: '11h 00m', shiftUsed: '4h 15m', shiftLimit: '14h 00m', weeklyUsed: '34h 00m', weeklyLimit: '70h 00m' },
+      safetyScore: 96,
+      tpms: [106, 105, 102, 102, 103, 102, 101, 101, 103, 102, 104, 104, 105, 104, 103, 103, 104, 104],
+      workOrder: {
+        id: 'WO-8904-TR108',
+        hub: 'Ames Logistics Depot',
+        bay: 'Bay 2',
+        tech: 'Frank Castle',
+        downtime: '1.0 Hour',
+        status: 'MONITORING'
+      }
+    },
+    {
+      id: '255',
+      driver: 'Marcus Brody',
+      phone: '+1 (319) 480-2299',
+      cdl: 'CDL-A #NE-88129033',
+      vin: '3AKJHHDR5LS98210',
+      model: '2022 Volvo VNL 860',
+      location: 'I-80 Westbound near Davenport, IA (MP 292)',
+      lat: 41.5236,
+      lng: -90.5776,
+      speed: 65,
+      heading: '268° W',
+      headingDeg: 268,
+      voltage: 14.0,
+      severity: 'warning',
+      rulHours: 24.0,
+      problem: 'DPF Soot Loading Delta +78% Backpressure',
+      impact: 'High exhaust backpressure; manual parked regeneration required.',
+      subsystem: 'Exhaust & Emissions',
+      subsystemScores: { powertrain: 81, electrical: 98, brakes: 95, transmission: 92 },
+      vibrationFreq: 30,
+      telemetry: { rpm: 1390, coolantF: 201, oilPressPsi: 45, fuelGph: 7.9, defPct: 65, boostPsi: 23.0 },
+      hos: { driveUsed: '6h 10m', driveLimit: '11h 00m', shiftUsed: '7h 00m', shiftLimit: '14h 00m', weeklyUsed: '39h 15m', weeklyLimit: '70h 00m' },
+      safetyScore: 92,
+      tpms: [108, 107, 103, 102, 102, 103, 101, 101, 102, 103, 105, 105, 104, 104, 103, 104, 104, 103],
+      workOrder: { id: 'WO-8905-TR255', hub: 'Quad Cities Logistics Hub', bay: 'Bay 4', tech: 'Gary Ross', downtime: '1.0 Hour', status: 'STAGED' }
+    },
+    {
+      id: '789',
+      driver: 'Elena Rostova',
+      phone: '+1 (515) 789-0021',
+      cdl: 'CDL-A #IA-19028374',
+      vin: '1FUJBBC98NL90124',
+      model: '2024 Peterbilt 579',
+      location: 'I-35 Southbound near Des Moines, IA (MP 78)',
+      lat: 41.5868,
+      lng: -93.6250,
+      speed: 58,
+      heading: '185° S',
+      headingDeg: 185,
+      voltage: 13.9,
+      severity: 'warning',
+      rulHours: 32.0,
+      problem: 'Transmission Oil Temperature +12°C Elevated',
+      impact: 'Fluid shearing risk under haulage loading; cooler flush recommended.',
+      subsystem: 'Transmission & Drive',
+      subsystemScores: { powertrain: 92, electrical: 95, brakes: 88, transmission: 74 },
+      vibrationFreq: 60,
+      telemetry: { rpm: 1420, coolantF: 196, oilPressPsi: 47, fuelGph: 7.4, defPct: 90, boostPsi: 21.0 },
+      hos: { driveUsed: '2h 15m', driveLimit: '11h 00m', shiftUsed: '3h 00m', shiftLimit: '14h 00m', weeklyUsed: '22h 30m', weeklyLimit: '70h 00m' },
+      safetyScore: 99,
+      tpms: [107, 107, 102, 102, 103, 103, 101, 101, 102, 102, 104, 104, 105, 105, 104, 104, 103, 103],
+      workOrder: { id: 'WO-8906-TR789', hub: 'Des Moines Logistics Hub', bay: 'Bay 2', tech: 'Marcus Vance', downtime: '1.2 Hours', status: 'STAGED' }
+    },
+    {
+      id: '331',
+      driver: 'Trevor Belmont',
+      phone: '+1 (319) 902-3311',
+      cdl: 'CDL-A #WI-55091823',
+      vin: '2WKDC29X5PM11904',
+      model: '2023 Kenworth T680',
+      location: 'I-80 Westbound near Newton, IA (MP 164)',
+      lat: 41.6997,
+      lng: -93.0477,
+      speed: 65,
+      heading: '272° W',
+      headingDeg: 272,
+      voltage: 14.1,
+      severity: 'warning',
+      rulHours: 48.0,
+      problem: 'Coolant Heat Dissipation Lag (Thermostat Sticky)',
+      impact: 'Sluggish thermostat cycle causing slow temp rise on climbs.',
+      subsystem: 'Thermal & Cooling',
+      subsystemScores: { powertrain: 94, electrical: 97, brakes: 93, transmission: 91 },
+      vibrationFreq: 25,
+      telemetry: { rpm: 1490, coolantF: 208, oilPressPsi: 43, fuelGph: 7.5, defPct: 76, boostPsi: 25.0 },
+      hos: { driveUsed: '8h 20m', driveLimit: '11h 00m', shiftUsed: '9h 40m', shiftLimit: '14h 00m', weeklyUsed: '58h 10m', weeklyLimit: '70h 00m' },
+      safetyScore: 91,
+      tpms: [106, 106, 102, 101, 102, 103, 100, 101, 102, 102, 105, 104, 104, 105, 103, 103, 104, 104],
+      workOrder: { id: 'WO-8907-TR331', hub: 'Newton Service Depot', bay: 'Bay 1', tech: 'Tom Sterling', downtime: '0.8 Hours', status: 'SCHEDULED' }
+    },
+    {
+      id: '044',
+      driver: 'David Kim',
+      phone: '+1 (515) 441-9988',
+      cdl: 'CDL-A #IL-30192844',
+      vin: '1FUJBBC92ML88219',
+      model: '2022 Freightliner Cascadia',
+      location: 'I-80 Eastbound near Altoona, IA (MP 142)',
+      lat: 41.6442,
+      lng: -93.4994,
+      speed: 63,
+      heading: '92° E',
+      headingDeg: 92,
+      voltage: 14.2,
+      severity: 'scheduled',
+      rulHours: 72.0,
+      problem: 'Routine PM-B Synthetic Oil Service in 1,200 KM',
+      impact: 'Scheduled maintenance interval approaching statutory limit.',
+      subsystem: 'Lubrication System',
+      subsystemScores: { powertrain: 96, electrical: 98, brakes: 92, transmission: 95 },
+      vibrationFreq: 20,
+      telemetry: { rpm: 1430, coolantF: 195, oilPressPsi: 48, fuelGph: 7.1, defPct: 89, boostPsi: 23.5 },
+      hos: { driveUsed: '4h 10m', driveLimit: '11h 00m', shiftUsed: '5h 00m', shiftLimit: '14h 00m', weeklyUsed: '28h 00m', weeklyLimit: '70h 00m' },
+      safetyScore: 98,
+      tpms: [108, 108, 103, 103, 102, 102, 101, 101, 103, 103, 105, 105, 104, 104, 104, 103, 104, 104],
+      workOrder: { id: 'WO-8908-TR044', hub: 'Des Moines Logistics Hub', bay: 'Bay 5', tech: 'Marcus Vance', downtime: '1.0 Hour', status: 'SCHEDULED' }
+    },
+    {
+      id: '517',
+      driver: 'Rachel Adams',
+      phone: '+1 (319) 517-8820',
+      cdl: 'CDL-A #IA-99201834',
+      vin: '3AKJHHDR9KS11942',
+      model: '2023 Volvo VNL 760',
+      location: 'I-80 Westbound near Coralville, IA (MP 240)',
+      lat: 41.6781,
+      lng: -91.5833,
+      speed: 64,
+      heading: '271° W',
+      headingDeg: 271,
+      voltage: 13.7,
+      severity: 'scheduled',
+      rulHours: 96.0,
+      problem: 'Pneumatic Air Dryer Desiccant Cartridge Saturation',
+      impact: 'Recommended desiccant cartridge exchange at next scheduled bay.',
+      subsystem: 'Pneumatic Brake Supply',
+      subsystemScores: { powertrain: 98, electrical: 97, brakes: 86, transmission: 94 },
+      vibrationFreq: 15,
+      telemetry: { rpm: 1460, coolantF: 197, oilPressPsi: 46, fuelGph: 7.3, defPct: 84, boostPsi: 24.0 },
+      hos: { driveUsed: '5h 00m', driveLimit: '11h 00m', shiftUsed: '6h 15m', shiftLimit: '14h 00m', weeklyUsed: '36h 40m', weeklyLimit: '70h 00m' },
+      safetyScore: 97,
+      tpms: [107, 108, 102, 103, 103, 102, 101, 101, 102, 103, 105, 104, 105, 104, 103, 103, 104, 104],
+      workOrder: { id: 'WO-8909-TR517', hub: 'Iowa City Service Hub', bay: 'Bay 2', tech: 'Paul Walker', downtime: '0.7 Hours', status: 'SCHEDULED' }
+    }
+  ],
+
+  // Driver Consumables Base Data
+  driverConsumables: {
+    oil: { name: 'Synthetic Heavy Engine Oil', currentKm: 5800, baseLimitKm: 12000, unit: 'km', cost: 180 },
+    brakes: { name: 'Front Ceramic Brake Pads', currentMm: 6.8, baseLimitMm: 12.0, minMm: 2.0, unit: 'mm', cost: 220 },
+    tires: { name: 'Steer Axle Commercial Tires', currentPct: 82, baseLimitKm: 60000, unit: '% tread', cost: 950 },
+    plugs: { name: 'High-Energy Spark/Glow Plugs', currentKm: 32000, baseLimitKm: 80000, unit: 'km', cost: 140 },
+    coolant: { name: 'Extended Life OAT Coolant Mix', currentPct: 78, baseLimitKm: 100000, unit: '% purity', cost: 90 },
+    trans: { name: 'Heavy Transmission Fluid', currentPct: 88, baseLimitKm: 120000, unit: '% viscosity', cost: 350 }
+  },
+
+  // Raw OBD-II PID Registry (12 standard channels)
+  pidChannels: [
+    { pid: '0x0C', name: 'Engine Speed (RPM)', hex: '01 0C', val: 1480, unit: 'RPM', norm: '600-2200', status: 'ok' },
+    { pid: '0x05', name: 'Engine Coolant Temp (ECT)', hex: '01 05', val: 92.2, unit: '°C', norm: '82-95°C', status: 'ok' },
+    { pid: '0x04', name: 'Calculated Engine Load', hex: '01 04', val: 45.0, unit: '%', norm: '20-85%', status: 'ok' },
+    { pid: '0x0F', name: 'Intake Air Temperature (IAT)', hex: '01 0F', val: 28.5, unit: '°C', norm: '15-45°C', status: 'ok' },
+    { pid: '0x42', name: 'Control Module Voltage', hex: '01 42', val: 13.84, unit: 'V', norm: '13.2-14.4V', status: 'ok' },
+    { pid: '0x06', name: 'Short-Term Fuel Trim (STFT)', hex: '01 06', val: +1.6, unit: '%', norm: '-10% to +10%', status: 'ok' },
+    { pid: '0x07', name: 'Long-Term Fuel Trim (LTFT)', hex: '01 07', val: +4.2, unit: '%', norm: '-10% to +10%', status: 'ok' },
+    { pid: '0x0D', name: 'Vehicle Speed Sensor (VSS)', hex: '01 0D', val: 103, unit: 'km/h', norm: '0-120 km/h', status: 'ok' },
+    { pid: '0x10', name: 'Mass Air Flow (MAF)', hex: '01 10', val: 84.2, unit: 'g/s', norm: '15-220 g/s', status: 'ok' },
+    { pid: '0x33', name: 'Absolute Barometric Pressure', hex: '01 33', val: 99.1, unit: 'kPa', norm: '95-105 kPa', status: 'ok' },
+    { pid: '0x1F', name: 'Engine Run Time Since Start', hex: '01 1F', val: 19080, unit: 'sec', norm: 'N/A', status: 'ok' },
+    { pid: '0x46', name: 'Ambient Air Temperature', hex: '01 46', val: 21.0, unit: '°C', norm: 'Ambient', status: 'ok' }
+  ]
 };
 
-// ============================================================================
-// 2. DOM ELEMENT REFERENCES
-// ============================================================================
-const DOM = {
-  // Header Elements
-  vehicleId: document.getElementById('vehicleIdDisplay'),
-  systemHealthBadge: document.getElementById('systemHealthBadge'),
-  systemHealthDot: document.getElementById('systemHealthDot'),
-  systemHealthText: document.getElementById('systemHealthText'),
-  mqttStatusDot: document.getElementById('mqttStatusDot'),
-  mqttStatusText: document.getElementById('mqttStatusText'),
-  modeToggleBtn: document.getElementById('modeToggleBtn'),
-  modeIcon: document.getElementById('modeIcon'),
-  modeText: document.getElementById('modeText'),
-  audioToggleBtn: document.getElementById('audioToggleBtn'),
-  audioIcon: document.getElementById('audioIcon'),
-  digitalClock: document.getElementById('digitalClock'),
+// ==============================================================================
+// 1. INITIALIZATION & AUTHENTICATION ROUTINES
+// ==============================================================================
 
-  // Quick Metric Ribbon
-  ribbonRpm: document.getElementById('ribbonRpm'),
-  ribbonRpmZone: document.getElementById('ribbonRpmZone'),
-  ribbonCoolant: document.getElementById('ribbonCoolant'),
-  ribbonCoolantStatus: document.getElementById('ribbonCoolantStatus'),
-  ribbonOil: document.getElementById('ribbonOil'),
-  ribbonThermalDelta: document.getElementById('ribbonThermalDelta'),
-  ribbonVoltage: document.getElementById('ribbonVoltage'),
-  aiHealthIndex: document.getElementById('aiHealthIndex'),
+window.addEventListener('DOMContentLoaded', () => {
+  initClock();
+  initLoginScreen();
+});
 
-  // RPM Gauge
-  rpmProgressArc: document.getElementById('rpmProgressArc'),
-  rpmNeedleGroup: document.getElementById('rpmNeedleGroup'),
-  rpmValue: document.getElementById('rpmValue'),
-  rpmZonePill: document.getElementById('rpmZonePill'),
-  rpmRedlineAlert: document.getElementById('rpmRedlineAlert'),
-  maxRpmRecorded: document.getElementById('maxRpmRecorded'),
-
-  // Vertical Gauges
-  engineLoadFill: document.getElementById('engineLoadFill'),
-  engineLoadValue: document.getElementById('engineLoadValue'),
-  loadStatusBadge: document.getElementById('loadStatusBadge'),
-  batteryVoltageFill: document.getElementById('batteryVoltageFill'),
-  batteryVoltageValue: document.getElementById('batteryVoltageValue'),
-  voltageStatusBadge: document.getElementById('voltageStatusBadge'),
-
-  // Thermal Cluster
-  coolantTempValue: document.getElementById('coolantTempValue'),
-  coolantZoneFill: document.getElementById('coolantZoneFill'),
-  coolantStatusText: document.getElementById('coolantStatusText'),
-  oilTempValue: document.getElementById('oilTempValue'),
-  oilZoneFill: document.getElementById('oilZoneFill'),
-  oilStatusText: document.getElementById('oilStatusText'),
-  intakeAirValue: document.getElementById('intakeAirValue'),
-
-  // AI Inference Banner & Sub-metrics
-  aiInferenceBox: document.getElementById('aiInferenceBox'),
-  aiInferenceText: document.getElementById('aiInferenceText'),
-  lambdaValue: document.getElementById('lambdaValue'),
-  anomalyRiskVal: document.getElementById('anomalyRiskVal'),
-  stftCurrentVal: document.getElementById('stftCurrentVal'),
-  ltftCurrentVal: document.getElementById('ltftCurrentVal'),
-
-  // Activity Feed
-  activityFeed: document.getElementById('activityFeed'),
-  logCountBadge: document.getElementById('logCountBadge'),
-  clearLogBtn: document.getElementById('clearLogBtn'),
-  pauseScrollBtn: document.getElementById('pauseScrollBtn'),
-  pauseScrollIcon: document.getElementById('pauseScrollIcon'),
-  pauseScrollText: document.getElementById('pauseScrollText'),
-
-  // Demo Injector Buttons
-  injectRevBtn: document.getElementById('injectRevBtn'),
-  injectLeanBtn: document.getElementById('injectLeanBtn'),
-  injectOverheatBtn: document.getElementById('injectOverheatBtn'),
-  injectBattSagBtn: document.getElementById('injectBattSagBtn'),
-  restoreNominalBtn: document.getElementById('restoreNominalBtn'),
-
-  // Footer Elements
-  footerBrokerAddress: document.getElementById('footerBrokerAddress'),
-  packetsReceivedCount: document.getElementById('packetsReceivedCount'),
-  ingestHzRate: document.getElementById('ingestHzRate')
-};
-
-// ============================================================================
-// 3. CHART.JS INITIALIZATION (LIQUID GLASS THEMED)
-// ============================================================================
-let thermalTrendChart = null;
-let stftChart = null;
-let ltftChart = null;
-
-// Common Glass Chart Styling Options
-const commonChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  animation: {
-    duration: 300,
-    easing: 'easeOutQuad'
-  },
-  interaction: {
-    mode: 'index',
-    intersect: false
-  },
-  plugins: {
-    legend: {
-      display: false
-    },
-    tooltip: {
-      backgroundColor: 'rgba(10, 18, 36, 0.85)',
-      titleColor: '#00d4ff',
-      bodyColor: '#e6f1ff',
-      borderColor: 'rgba(0, 200, 255, 0.3)',
-      borderWidth: 1,
-      padding: 8,
-      titleFont: { family: 'JetBrains Mono', size: 10, weight: 'bold' },
-      bodyFont: { family: 'JetBrains Mono', size: 10 },
-      boxPadding: 4,
-      usePointStyle: true
-    }
-  },
-  scales: {
-    x: {
-      grid: {
-        color: 'rgba(0, 200, 255, 0.05)',
-        tickColor: 'transparent'
-      },
-      ticks: {
-        color: '#536b8e',
-        font: { family: 'JetBrains Mono', size: 9 },
-        maxTicksLimit: 6
-      }
-    },
-    y: {
-      grid: {
-        color: 'rgba(0, 200, 255, 0.08)',
-        tickColor: 'transparent'
-      },
-      ticks: {
-        color: '#88a0c5',
-        font: { family: 'JetBrains Mono', size: 9 }
-      }
-    }
-  }
-};
-
-/**
- * Initialize all three Chart.js visualizers
- */
-function initCharts() {
-  const ctxThermal = document.getElementById('thermalTrendChart').getContext('2d');
-  const ctxStft = document.getElementById('stftChart').getContext('2d');
-  const ctxLtft = document.getElementById('ltftChart').getContext('2d');
-
-  // Gradient for Coolant
-  const coolantGradient = ctxThermal.createLinearGradient(0, 0, 0, 140);
-  coolantGradient.addColorStop(0, 'rgba(0, 212, 255, 0.28)');
-  coolantGradient.addColorStop(1, 'rgba(0, 212, 255, 0.0)');
-
-  // Gradient for Oil
-  const oilGradient = ctxThermal.createLinearGradient(0, 0, 0, 140);
-  oilGradient.addColorStop(0, 'rgba(255, 170, 0, 0.2)');
-  oilGradient.addColorStop(1, 'rgba(255, 170, 0, 0.0)');
-
-  // 1. Oil vs Coolant Temperature Trend Chart (Dual Line, 30 points)
-  thermalTrendChart = new Chart(ctxThermal, {
-    type: 'line',
-    data: {
-      labels: Array(CONFIG.charts.maxThermalPoints).fill(''),
-      datasets: [
-        {
-          label: 'Coolant Temp (°C)',
-          data: Array(CONFIG.charts.maxThermalPoints).fill(85),
-          borderColor: '#00d4ff',
-          backgroundColor: coolantGradient,
-          fill: true,
-          borderWidth: 2,
-          pointRadius: 1,
-          pointHoverRadius: 4,
-          tension: 0.35
-        },
-        {
-          label: 'Oil Temp (°C)',
-          data: Array(CONFIG.charts.maxThermalPoints).fill(92),
-          borderColor: '#ffaa00',
-          backgroundColor: oilGradient,
-          fill: true,
-          borderWidth: 2,
-          pointRadius: 1,
-          pointHoverRadius: 4,
-          tension: 0.35
-        }
-      ]
-    },
-    options: {
-      ...commonChartOptions,
-      scales: {
-        ...commonChartOptions.scales,
-        y: {
-          ...commonChartOptions.scales.y,
-          min: 60,
-          max: 125,
-          ticks: {
-            ...commonChartOptions.scales.y.ticks,
-            callback: (val) => val + '°C'
-          }
-        }
-      }
-    }
-  });
-
-  // Gradients for Fuel Trim
-  const stftGradient = ctxStft.createLinearGradient(0, 0, 0, 120);
-  stftGradient.addColorStop(0, 'rgba(0, 212, 255, 0.25)');
-  stftGradient.addColorStop(1, 'rgba(0, 212, 255, 0.0)');
-
-  // 2. Short-Term Fuel Trim (STFT) Chart (50 points, ±10% threshold lines)
-  const stftThresholdUpper = Array(CONFIG.charts.maxFuelTrimPoints).fill(10);
-  const stftThresholdLower = Array(CONFIG.charts.maxFuelTrimPoints).fill(-10);
-  const stftBaseline = Array(CONFIG.charts.maxFuelTrimPoints).fill(0);
-
-  stftChart = new Chart(ctxStft, {
-    type: 'line',
-    data: {
-      labels: Array(CONFIG.charts.maxFuelTrimPoints).fill(''),
-      datasets: [
-        {
-          label: 'STFT (%)',
-          data: Array(CONFIG.charts.maxFuelTrimPoints).fill(2.3),
-          borderColor: '#00d4ff',
-          backgroundColor: stftGradient,
-          fill: true,
-          borderWidth: 2,
-          pointRadius: 1,
-          tension: 0.25
-        },
-        {
-          label: '+10% Limit',
-          data: stftThresholdUpper,
-          borderColor: 'rgba(255, 204, 0, 0.65)',
-          borderDash: [4, 4],
-          borderWidth: 1.2,
-          pointRadius: 0,
-          fill: false
-        },
-        {
-          label: '-10% Limit',
-          data: stftThresholdLower,
-          borderColor: 'rgba(255, 204, 0, 0.65)',
-          borderDash: [4, 4],
-          borderWidth: 1.2,
-          pointRadius: 0,
-          fill: false
-        },
-        {
-          label: 'Stoichiometric 0%',
-          data: stftBaseline,
-          borderColor: 'rgba(0, 200, 255, 0.18)',
-          borderDash: [2, 3],
-          borderWidth: 1,
-          pointRadius: 0,
-          fill: false
-        }
-      ]
-    },
-    options: {
-      ...commonChartOptions,
-      scales: {
-        ...commonChartOptions.scales,
-        y: {
-          ...commonChartOptions.scales.y,
-          min: -16,
-          max: 16,
-          ticks: {
-            ...commonChartOptions.scales.y.ticks,
-            stepSize: 8,
-            callback: (val) => (val > 0 ? '+' : '') + val + '%'
-          }
-        }
-      }
-    }
-  });
-
-  // Gradients for LTFT
-  const ltftGradient = ctxLtft.createLinearGradient(0, 0, 0, 120);
-  ltftGradient.addColorStop(0, 'rgba(168, 85, 247, 0.22)');
-  ltftGradient.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
-
-  // 3. Long-Term Fuel Trim (LTFT) Chart (50 points, ±10% threshold lines in warning colors)
-  ltftChart = new Chart(ctxLtft, {
-    type: 'line',
-    data: {
-      labels: Array(CONFIG.charts.maxFuelTrimPoints).fill(''),
-      datasets: [
-        {
-          label: 'LTFT Drift (%)',
-          data: Array(CONFIG.charts.maxFuelTrimPoints).fill(4.1),
-          borderColor: '#c084fc',
-          backgroundColor: ltftGradient,
-          fill: true,
-          borderWidth: 2,
-          pointRadius: 1,
-          tension: 0.25
-        },
-        {
-          label: '+10% Drift Limit',
-          data: Array(CONFIG.charts.maxFuelTrimPoints).fill(10),
-          borderColor: 'rgba(255, 51, 68, 0.75)',
-          borderDash: [4, 4],
-          borderWidth: 1.2,
-          pointRadius: 0,
-          fill: false
-        },
-        {
-          label: '-10% Drift Limit',
-          data: Array(CONFIG.charts.maxFuelTrimPoints).fill(-10),
-          borderColor: 'rgba(255, 51, 68, 0.75)',
-          borderDash: [4, 4],
-          borderWidth: 1.2,
-          pointRadius: 0,
-          fill: false
-        },
-        {
-          label: 'Zero Baseline',
-          data: Array(CONFIG.charts.maxFuelTrimPoints).fill(0),
-          borderColor: 'rgba(168, 85, 247, 0.2)',
-          borderDash: [2, 3],
-          borderWidth: 1,
-          pointRadius: 0,
-          fill: false
-        }
-      ]
-    },
-    options: {
-      ...commonChartOptions,
-      scales: {
-        ...commonChartOptions.scales,
-        y: {
-          ...commonChartOptions.scales.y,
-          min: -16,
-          max: 16,
-          ticks: {
-            ...commonChartOptions.scales.y.ticks,
-            stepSize: 8,
-            callback: (val) => (val > 0 ? '+' : '') + val + '%'
-          }
-        }
-      }
-    }
-  });
+function initLoginScreen() {
+  document.getElementById('role-fleet-btn').classList.add('selected');
 }
 
-// ============================================================================
-// 4. GAUGE UPDATE IMPLEMENTATIONS
-// ============================================================================
-
-/**
- * Updates the semi-circular RPM gauge (0-8000 range)
- * Changes color zones: green < 3000, yellow 3000-5500, red > 5500
- * @param {number} rpm - Current engine RPM
- */
-function updateRPMGauge(rpm) {
-  const clampedRpm = Math.max(0, Math.min(CONFIG.gaugeConstants.rpmMax, rpm));
-  const ratio = clampedRpm / CONFIG.gaugeConstants.rpmMax;
-
-  // Track max RPM observed
-  if (clampedRpm > STATE.maxRpmObserved) {
-    STATE.maxRpmObserved = Math.round(clampedRpm);
-    if (DOM.maxRpmRecorded) {
-      DOM.maxRpmRecorded.textContent = STATE.maxRpmObserved.toLocaleString();
-    }
-  }
-
-  // 1. Calculate SVG Arc Stroke Dashoffset
-  // Arc length is ~330px. 0 RPM = 330 offset (empty), 8000 RPM = 0 offset (full)
-  const offset = CONFIG.gaugeConstants.rpmArcCircumference - (ratio * CONFIG.gaugeConstants.rpmArcCircumference);
-  if (DOM.rpmProgressArc) {
-    DOM.rpmProgressArc.style.strokeDashoffset = offset;
-  }
-
-  // 2. Rotate Needle: -90deg (0 RPM) to +90deg (8000 RPM)
-  const needleAngle = -90 + (ratio * 180);
-  if (DOM.rpmNeedleGroup) {
-    DOM.rpmNeedleGroup.setAttribute('transform', `rotate(${needleAngle} 140 145)`);
-  }
-
-  // 3. Update Digital Display
-  if (DOM.rpmValue) {
-    DOM.rpmValue.textContent = Math.round(clampedRpm).toLocaleString();
-  }
-  if (DOM.ribbonRpm) {
-    DOM.ribbonRpm.innerHTML = `${Math.round(clampedRpm).toLocaleString()} <span class="unit">RPM</span>`;
-  }
-
-  // 4. Color Zones Logic (green < 3000, yellow 3000-5500, red > 5500)
-  if (clampedRpm < 3000) {
-    // NOMINAL ZONE (< 3000)
-    if (DOM.rpmProgressArc) DOM.rpmProgressArc.setAttribute('stroke', 'url(#rpmGradientNominal)');
-    if (DOM.rpmZonePill) {
-      DOM.rpmZonePill.className = 'rpm-zone-pill nominal';
-      DOM.rpmZonePill.textContent = 'NOMINAL CRUISE';
-    }
-    if (DOM.ribbonRpmZone) {
-      DOM.ribbonRpmZone.className = 'ribbon-trend positive';
-      DOM.ribbonRpmZone.textContent = 'NORMAL';
-    }
-    if (DOM.rpmRedlineAlert) DOM.rpmRedlineAlert.style.display = 'none';
-
-  } else if (clampedRpm <= 5500) {
-    // WARNING ZONE (3000 - 5500)
-    if (DOM.rpmProgressArc) DOM.rpmProgressArc.setAttribute('stroke', 'url(#rpmGradientWarning)');
-    if (DOM.rpmZonePill) {
-      DOM.rpmZonePill.className = 'rpm-zone-pill warning';
-      DOM.rpmZonePill.textContent = 'POWER BAND';
-    }
-    if (DOM.ribbonRpmZone) {
-      DOM.ribbonRpmZone.className = 'ribbon-trend warning';
-      DOM.ribbonRpmZone.textContent = 'HIGH REV';
-    }
-    if (DOM.rpmRedlineAlert) DOM.rpmRedlineAlert.style.display = 'none';
-
-  } else {
-    // DANGER ZONE (> 5500)
-    if (DOM.rpmProgressArc) DOM.rpmProgressArc.setAttribute('stroke', 'url(#rpmGradientDanger)');
-    if (DOM.rpmZonePill) {
-      DOM.rpmZonePill.className = 'rpm-zone-pill danger';
-      DOM.rpmZonePill.textContent = 'NEAR REDLINE';
-    }
-    if (DOM.ribbonRpmZone) {
-      DOM.ribbonRpmZone.className = 'ribbon-trend danger';
-      DOM.ribbonRpmZone.textContent = 'CRITICAL';
-    }
-
-    // Trigger Over-Rev Redline Alert if > 6500 RPM
-    if (clampedRpm > 6500) {
-      if (DOM.rpmRedlineAlert) DOM.rpmRedlineAlert.style.display = 'flex';
-      playChime('critical');
-    } else {
-      if (DOM.rpmRedlineAlert) DOM.rpmRedlineAlert.style.display = 'none';
-    }
-  }
-}
-
-/**
- * Updates Engine Load vertical bar gauge (0-100%)
- * @param {number} percent - Engine load percentage
- */
-function updateEngineLoad(percent) {
-  const load = Math.max(0, Math.min(100, Math.round(percent)));
-
-  // Update Bar Height
-  if (DOM.engineLoadFill) {
-    DOM.engineLoadFill.style.height = `${load}%`;
-    
-    // Color shift on high load
-    if (load > 85) {
-      DOM.engineLoadFill.className = 'v-tube-fill load-gradient danger';
-    } else if (load > 65) {
-      DOM.engineLoadFill.className = 'v-tube-fill load-gradient warning';
-    } else {
-      DOM.engineLoadFill.className = 'v-tube-fill load-gradient';
-    }
-  }
-
-  // Update Numeric Readout
-  if (DOM.engineLoadValue) {
-    DOM.engineLoadValue.textContent = load;
-  }
-
-  // Update Status Badge
-  if (DOM.loadStatusBadge) {
-    if (load < 25) {
-      DOM.loadStatusBadge.textContent = 'LIGHT / IDLE';
-      DOM.loadStatusBadge.className = 'v-status-badge';
-    } else if (load < 70) {
-      DOM.loadStatusBadge.textContent = 'MODERATE LOAD';
-      DOM.loadStatusBadge.className = 'v-status-badge';
-    } else if (load < 88) {
-      DOM.loadStatusBadge.textContent = 'HEAVY DEMAND';
-      DOM.loadStatusBadge.className = 'v-status-badge warning';
-    } else {
-      DOM.loadStatusBadge.textContent = 'WOT PEAK LOAD';
-      DOM.loadStatusBadge.className = 'v-status-badge danger';
-    }
-  }
-}
-
-/**
- * Updates Battery Voltage vertical bar (10-15V range) with color zones
- * @param {number} volts - Battery/alternator voltage in volts
- */
-function updateBatteryVoltage(volts) {
-  const v = Math.max(10.0, Math.min(15.0, Number(volts)));
-  const percentage = ((v - 10.0) / (15.0 - 10.0)) * 100;
-
-  // Update Fill Height
-  if (DOM.batteryVoltageFill) {
-    DOM.batteryVoltageFill.style.height = `${percentage}%`;
-  }
-
-  // Update Readout
-  const formattedV = v.toFixed(1);
-  if (DOM.batteryVoltageValue) {
-    DOM.batteryVoltageValue.textContent = formattedV;
-  }
-  if (DOM.ribbonVoltage) {
-    DOM.ribbonVoltage.innerHTML = `${formattedV} <span class="unit">V</span>`;
-  }
-
-  // Color Zones Evaluation:
-  // Under-voltage < 11.8V (Red)
-  // Marginal 11.8V - 12.0V (Yellow)
-  // Optimal Charging 12.0V - 14.4V (Green)
-  // Over-voltage > 14.5V (Yellow / Warning)
-  if (v < 11.8) {
-    if (DOM.batteryVoltageFill) DOM.batteryVoltageFill.className = 'v-tube-fill voltage-danger';
-    if (DOM.voltageStatusBadge) {
-      DOM.voltageStatusBadge.className = 'v-status-badge danger';
-      DOM.voltageStatusBadge.textContent = 'UNDER-VOLTAGE';
-    }
-  } else if (v < 12.0) {
-    if (DOM.batteryVoltageFill) DOM.batteryVoltageFill.className = 'v-tube-fill voltage-warning';
-    if (DOM.voltageStatusBadge) {
-      DOM.voltageStatusBadge.className = 'v-status-badge warning';
-      DOM.voltageStatusBadge.textContent = 'BATTERY LOW';
-    }
-  } else if (v <= 14.4) {
-    if (DOM.batteryVoltageFill) DOM.batteryVoltageFill.className = 'v-tube-fill voltage-nominal';
-    if (DOM.voltageStatusBadge) {
-      DOM.voltageStatusBadge.className = 'v-status-badge positive';
-      DOM.voltageStatusBadge.textContent = 'OPTIMAL CHARGING';
-    }
-  } else {
-    if (DOM.batteryVoltageFill) DOM.batteryVoltageFill.className = 'v-tube-fill voltage-warning';
-    if (DOM.voltageStatusBadge) {
-      DOM.voltageStatusBadge.className = 'v-status-badge warning';
-      DOM.voltageStatusBadge.textContent = 'OVER-CHARGE ALERT';
-    }
-  }
-}
-
-/**
- * Updates Coolant Temperature, Oil Temperature and Intake Air values with color codes
- */
-function updateThermalCluster(coolant, oil, intake) {
-  const c = Math.round(coolant);
-  const o = Math.round(oil);
-  const i = Math.round(intake);
-
-  // Coolant Display
-  if (DOM.coolantTempValue) {
-    DOM.coolantTempValue.textContent = c;
-    if (c < 80) {
-      DOM.coolantTempValue.className = 'kpi-big-val';
-      if (DOM.coolantStatusText) DOM.coolantStatusText.textContent = 'WARMUP PHASE (<80°C)';
-      if (DOM.coolantZoneFill) DOM.coolantZoneFill.className = 'kpi-zone-fill cyan';
-    } else if (c <= 95) {
-      DOM.coolantTempValue.className = 'kpi-big-val nominal';
-      if (DOM.coolantStatusText) DOM.coolantStatusText.textContent = 'OPTIMAL (80-95°C)';
-      if (DOM.coolantZoneFill) DOM.coolantZoneFill.className = 'kpi-zone-fill';
-    } else if (c <= 105) {
-      DOM.coolantTempValue.className = 'kpi-big-val warning';
-      if (DOM.coolantStatusText) DOM.coolantStatusText.textContent = 'HIGH THERMAL LOAD';
-      if (DOM.coolantZoneFill) DOM.coolantZoneFill.className = 'kpi-zone-fill amber';
-    } else {
-      DOM.coolantTempValue.className = 'kpi-big-val danger';
-      if (DOM.coolantStatusText) DOM.coolantStatusText.textContent = 'OVERHEAT CRITICAL!';
-      if (DOM.coolantZoneFill) DOM.coolantZoneFill.className = 'kpi-zone-fill danger';
-      playChime('critical');
-    }
-  }
-
-  // Ribbon Coolant
-  if (DOM.ribbonCoolant) {
-    DOM.ribbonCoolant.innerHTML = `${c} <span class="unit">°C</span>`;
-  }
-  if (DOM.ribbonCoolantStatus) {
-    if (c > 105) {
-      DOM.ribbonCoolantStatus.className = 'ribbon-trend danger';
-      DOM.ribbonCoolantStatus.textContent = 'OVERHEAT';
-    } else if (c > 95) {
-      DOM.ribbonCoolantStatus.className = 'ribbon-trend warning';
-      DOM.ribbonCoolantStatus.textContent = 'ELEVATED';
-    } else {
-      DOM.ribbonCoolantStatus.className = 'ribbon-trend positive';
-      DOM.ribbonCoolantStatus.textContent = 'OPTIMAL';
-    }
-  }
-
-  // Oil Display
-  if (DOM.oilTempValue) {
-    DOM.oilTempValue.textContent = o;
-    if (o > 115) {
-      DOM.oilTempValue.className = 'kpi-big-val danger';
-      if (DOM.oilStatusText) DOM.oilStatusText.textContent = 'DEGRADATION RISK (>115°C)';
-    } else {
-      DOM.oilTempValue.className = 'kpi-big-val nominal';
-      if (DOM.oilStatusText) DOM.oilStatusText.textContent = 'OPTIMAL VISCOSITY';
-    }
-  }
-  if (DOM.ribbonOil) {
-    DOM.ribbonOil.innerHTML = `${o} <span class="unit">°C</span>`;
-  }
-
-  // Thermal Delta
-  const deltaT = o - c;
-  if (DOM.ribbonThermalDelta) {
-    DOM.ribbonThermalDelta.textContent = `ΔT ${deltaT >= 0 ? '+' : ''}${deltaT}°C`;
-  }
-
-  // Intake Air
-  if (DOM.intakeAirValue) {
-    DOM.intakeAirValue.textContent = i;
-  }
-}
-
-/**
- * Updates AI Fuel Trim readings & Neural Diagnostics Inference
- */
-function updateFuelTrims(stft, ltft) {
-  const s = Number(stft);
-  const l = Number(ltft);
-
-  if (DOM.stftCurrentVal) {
-    DOM.stftCurrentVal.textContent = (s >= 0 ? '+' : '') + s.toFixed(1) + '%';
-    DOM.stftCurrentVal.style.color = Math.abs(s) > CONFIG.charts.stftThreshold ? 'var(--warning-yellow)' : 'var(--cyan-glow)';
-  }
-
-  if (DOM.ltftCurrentVal) {
-    DOM.ltftCurrentVal.textContent = (l >= 0 ? '+' : '') + l.toFixed(1) + '%';
-    DOM.ltftCurrentVal.style.color = Math.abs(l) > CONFIG.charts.ltftThreshold ? 'var(--danger-red)' : '#c084fc';
-  }
-
-  // Calculate synthetic Lambda estimate: λ ≈ 1.0 - (stft + ltft) / 100
-  const estimatedLambda = (1.0 - ((s + l) * 0.007)).toFixed(3);
-  if (DOM.lambdaValue) {
-    DOM.lambdaValue.textContent = estimatedLambda;
-  }
-
-  // AI Diagnostic assessment text & risk score
-  let riskScore = 0.8;
-  if (Math.abs(s) > 12.0 || Math.abs(l) > 10.0) {
-    riskScore = 84.5;
-    if (DOM.aiInferenceText) {
-      DOM.aiInferenceText.textContent = `ANOMALY DETECTED: Bank 1 unmetered air leak suspected! Fuel trim drift STFT (${s > 0 ? '+' : ''}${s}%) exceeds ±10% threshold. Closed-loop adaptation reaching ceiling.`;
-    }
-    if (DOM.aiInferenceBox) {
-      DOM.aiInferenceBox.style.borderLeftColor = 'var(--danger-red)';
-    }
-    if (DOM.anomalyRiskVal) {
-      DOM.anomalyRiskVal.className = 'val warning';
-      DOM.anomalyRiskVal.textContent = riskScore + '%';
-    }
-  } else if (Math.abs(s) > 8.0 || Math.abs(l) > 7.0) {
-    riskScore = 24.2;
-    if (DOM.aiInferenceText) {
-      DOM.aiInferenceText.textContent = `ADVISORY: Moderate fuel trim compensation active. STFT (${s > 0 ? '+' : ''}${s}%). Monitoring MAF sensor calibration and oxygen sensor switching rate.`;
-    }
-    if (DOM.aiInferenceBox) {
-      DOM.aiInferenceBox.style.borderLeftColor = 'var(--warning-yellow)';
-    }
-    if (DOM.anomalyRiskVal) {
-      DOM.anomalyRiskVal.className = 'val warning';
-      DOM.anomalyRiskVal.textContent = riskScore + '%';
-    }
-  } else {
-    riskScore = 0.8;
-    if (DOM.aiInferenceText) {
-      DOM.aiInferenceText.textContent = `ECU closed-loop stoichiometric fuel correction stable. STFT (${s > 0 ? '+' : ''}${s}%) and LTFT (${l > 0 ? '+' : ''}${l}%) are well within ±10% tolerance band. Lambda λ = ${estimatedLambda}.`;
-    }
-    if (DOM.aiInferenceBox) {
-      DOM.aiInferenceBox.style.borderLeftColor = 'var(--purple-ai)';
-    }
-    if (DOM.anomalyRiskVal) {
-      DOM.anomalyRiskVal.className = 'val green';
-      DOM.anomalyRiskVal.textContent = riskScore + '%';
-    }
-  }
-
-  // AI Health Score
-  if (DOM.aiHealthIndex) {
-    const health = Math.max(72.0, (100 - (riskScore * 0.3))).toFixed(1);
-    DOM.aiHealthIndex.innerHTML = `${health} <span class="unit">%</span>`;
-  }
-}
-
-/**
- * Pushes new data points into Chart.js datasets with smooth streaming
- */
-function updateChartDatasets(coolant, oil, stft, ltft) {
-  // 1. Thermal Chart Update (Last 30 points)
-  if (thermalTrendChart) {
-    const coolantData = thermalTrendChart.data.datasets[0].data;
-    const oilData = thermalTrendChart.data.datasets[1].data;
-
-    coolantData.push(coolant);
-    oilData.push(oil);
-
-    if (coolantData.length > CONFIG.charts.maxThermalPoints) {
-      coolantData.shift();
-      oilData.shift();
-    }
-    thermalTrendChart.update('none'); // Update without full redraw animation for performance
-  }
-
-  // 2. STFT Chart Update (Last 50 points)
-  if (stftChart) {
-    const sData = stftChart.data.datasets[0].data;
-    sData.push(stft);
-    if (sData.length > CONFIG.charts.maxFuelTrimPoints) {
-      sData.shift();
-    }
-    stftChart.update('none');
-  }
-
-  // 3. LTFT Chart Update (Last 50 points)
-  if (ltftChart) {
-    const lData = ltftChart.data.datasets[0].data;
-    lData.push(ltft);
-    if (lData.length > CONFIG.charts.maxFuelTrimPoints) {
-      lData.shift();
-    }
-    ltftChart.update('none');
-  }
-}
-
-// ============================================================================
-// 5. ACTIVITY FEED IMPLEMENTATION (COLOR CODED LOGS)
-// ============================================================================
-
-/**
- * Prepends a new timestamped activity log entry with severity border coding
- * @param {string} message - Message description
- * @param {string} severity - 'nominal' | 'advisory' | 'anomaly' | 'critical' | 'system'
- */
-function addLogEntry(message, severity = 'nominal') {
-  if (!DOM.activityFeed) return;
-
-  const validSeverities = ['nominal', 'advisory', 'anomaly', 'critical', 'system'];
-  const safeSeverity = validSeverities.includes(severity) ? severity : 'nominal';
-
-  // Format Timestamp HH:MM:SS
-  const now = new Date();
-  const timeStr = [
-    String(now.getHours()).padStart(2, '0'),
-    String(now.getMinutes()).padStart(2, '0'),
-    String(now.getSeconds()).padStart(2, '0')
-  ].join(':');
-
-  // Create Log Element
-  const item = document.createElement('div');
-  item.className = `log-entry ${safeSeverity}`;
-  item.innerHTML = `
-    <span class="log-timestamp">${timeStr}</span>
-    <span class="log-badge ${safeSeverity}">${safeSeverity.toUpperCase()}</span>
-    <span class="log-message">${escapeHtml(message)}</span>
-  `;
-
-  // Prepend to top of activity container
-  DOM.activityFeed.insertBefore(item, DOM.activityFeed.firstChild);
-
-  // Maintain max limit (50 entries)
-  while (DOM.activityFeed.children.length > CONFIG.feed.maxEntries) {
-    DOM.activityFeed.removeChild(DOM.activityFeed.lastChild);
-  }
-
-  // Update Counter Badge
-  if (DOM.logCountBadge) {
-    DOM.logCountBadge.textContent = `${DOM.activityFeed.children.length} EVENTS`;
-  }
-
-  // Auto-scroll to top if enabled
-  if (STATE.autoScrollEnabled) {
-    DOM.activityFeed.scrollTop = 0;
-  }
-
-  // Trigger audio feedback chime
-  if (safeSeverity === 'anomaly' || safeSeverity === 'critical') {
-    playChime(safeSeverity);
-  }
-}
-
-/**
- * HTML Escaping helper
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// ============================================================================
-// 6. AUDIO SYNTHESIZER (ZERO-DEPENDENCY WEB AUDIO API)
-// ============================================================================
-
-/**
- * Initializes or resumes the AudioContext
- */
-function initAudio() {
-  if (!STATE.audioCtx) {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (AudioContextClass) {
-      STATE.audioCtx = new AudioContextClass();
-    }
-  }
-  if (STATE.audioCtx && STATE.audioCtx.state === 'suspended') {
-    STATE.audioCtx.resume();
-  }
-}
-
-/**
- * Plays futuristic synth chimes for HUD alerts
- */
-function playChime(type = 'click') {
-  if (!STATE.audioEnabled || !STATE.audioCtx) return;
-
-  try {
-    const ctx = STATE.audioCtx;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    const now = ctx.currentTime;
-
-    if (type === 'critical') {
-      // High-pitched double alert beep
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(880, now);
-      osc.frequency.setValueAtTime(440, now + 0.1);
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
-      osc.start(now);
-      osc.stop(now + 0.28);
-
-    } else if (type === 'anomaly' || type === 'warning') {
-      // Sci-fi two-tone notification
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(520, now);
-      osc.frequency.exponentialRampToValueAtTime(780, now + 0.15);
-      gain.gain.setValueAtTime(0.09, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-      osc.start(now);
-      osc.stop(now + 0.22);
-
-    } else {
-      // Soft UI Click
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1040, now);
-      gain.gain.setValueAtTime(0.04, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-      osc.start(now);
-      osc.stop(now + 0.05);
-    }
-  } catch (err) {
-    console.debug('Audio synth error:', err);
-  }
-}
-
-// ============================================================================
-// 7. TELEMETRY INGESTION DISPATCHER
-// ============================================================================
-
-/**
- * Ingests and routes a validated telemetry payload
- * @param {Object} data - Telemetry JSON payload
- */
-function processTelemetryPayload(data) {
-  if (!data || typeof data !== 'object') return;
-
-  STATE.packetsReceived++;
-  const now = Date.now();
-  STATE.packetTimes.push(now);
-
-  // Calculate packet frequency (Hz)
-  const oneSecAgo = now - 1000;
-  STATE.packetTimes = STATE.packetTimes.filter(t => t > oneSecAgo);
-  const hzRate = STATE.packetTimes.length.toFixed(1);
-
-  if (DOM.packetsReceivedCount) DOM.packetsReceivedCount.textContent = STATE.packetsReceived.toLocaleString();
-  if (DOM.ingestHzRate) DOM.ingestHzRate.textContent = hzRate;
-
-  // Extract fields with fallbacks
-  const rpm = Number(data.rpm !== undefined ? data.rpm : 2400);
-  const coolant = Number(data.coolant_temp !== undefined ? data.coolant_temp : 85);
-  const oil = Number(data.oil_temp !== undefined ? data.oil_temp : 92);
-  const voltage = Number(data.battery_voltage !== undefined ? data.battery_voltage : 13.8);
-  const load = Number(data.engine_load !== undefined ? data.engine_load : 45);
-  const stft = Number(data.stft !== undefined ? data.stft : 2.3);
-  const ltft = Number(data.ltft !== undefined ? data.ltft : 4.1);
-  const intake = Number(data.intake_air_temp !== undefined ? data.intake_air_temp : 35);
-  const vehicleId = data.vehicle_id || 'KA-TRUCK-001';
-  const status = data.status || 'NOMINAL';
-
-  // Update State Buffer
-  STATE.telemetry = {
-    rpm, coolant_temp: coolant, oil_temp: oil, battery_voltage: voltage,
-    engine_load: load, stft, ltft, intake_air_temp: intake,
-    status, vehicle_id: vehicleId, timestamp: data.timestamp || now
-  };
-
-  // 1. Vehicle ID Update
-  if (DOM.vehicleId && DOM.vehicleId.textContent !== vehicleId) {
-    DOM.vehicleId.textContent = vehicleId;
-  }
-
-  // 2. System Status Badge
-  updateSystemHealth(status, coolant, voltage, stft);
-
-  // 3. Central Gauges Update
-  updateRPMGauge(rpm);
-  updateEngineLoad(load);
-  updateBatteryVoltage(voltage);
-
-  // 4. Thermal & AI Panels
-  updateThermalCluster(coolant, oil, intake);
-  updateFuelTrims(stft, ltft);
-
-  // 5. Update Real-Time Charts
-  updateChartDatasets(coolant, oil, stft, ltft);
-}
-
-/**
- * Updates Overall Vehicle Status Indicator in Header
- */
-function updateSystemHealth(status, coolant, voltage, stft) {
-  let computedStatus = status.toUpperCase();
-
-  // Automatic severity escalation based on physical limits
-  if (coolant > 105 || voltage < 11.5) {
-    computedStatus = 'CRITICAL';
-  } else if (coolant > 98 || Math.abs(stft) > 10.0 || voltage < 12.0) {
-    if (computedStatus !== 'CRITICAL') computedStatus = 'ADVISORY';
-  }
-
-  if (DOM.systemHealthText) DOM.systemHealthText.textContent = `SYSTEM ${computedStatus}`;
+function selectRole(role) {
+  APP.currentRole = role;
+  document.getElementById('role-fleet-btn').classList.toggle('selected', role === 'fleet');
+  document.getElementById('role-driver-btn').classList.toggle('selected', role === 'driver');
   
-  if (DOM.systemHealthDot) {
-    if (computedStatus === 'CRITICAL') {
-      DOM.systemHealthDot.className = 'status-pulse-dot danger';
-      if (DOM.systemHealthBadge) DOM.systemHealthBadge.style.borderColor = 'rgba(255, 51, 68, 0.4)';
-    } else if (computedStatus === 'ADVISORY' || computedStatus === 'WARNING') {
-      DOM.systemHealthDot.className = 'status-pulse-dot warning';
-      if (DOM.systemHealthBadge) DOM.systemHealthBadge.style.borderColor = 'rgba(255, 204, 0, 0.4)';
-    } else {
-      DOM.systemHealthDot.className = 'status-pulse-dot';
-      if (DOM.systemHealthBadge) DOM.systemHealthBadge.style.borderColor = 'rgba(0, 255, 136, 0.35)';
-    }
+  const btnText = document.getElementById('login-btn-text');
+  if (role === 'fleet') {
+    btnText.innerText = 'INITIALIZE MISSION CONTROL';
+  } else {
+    btnText.innerText = 'ENTER IN-CAB COCKPIT';
   }
 }
 
-// ============================================================================
-// 8. MQTT NETWORK CLIENT CONFIGURATION
-// ============================================================================
-
-/**
- * Configures and connects to MQTT Broker over WebSockets
- */
-function initMQTT() {
-  setConnectionStatus('connecting', 'CONNECTING...');
-
-  addLogEntry(`Initializing MQTT connection to ${CONFIG.mqtt.brokerUrl}`, 'system');
-
-  try {
-    // Check if mqtt library is loaded from CDN
-    if (typeof mqtt === 'undefined') {
-      throw new Error('MQTT.js library not loaded from CDN.');
-    }
-
-    const options = {
-      clientId: CONFIG.mqtt.clientId,
-      clean: true,
-      connectTimeout: CONFIG.mqtt.connectTimeoutMs,
-      keepalive: CONFIG.mqtt.keepalive,
-      reconnectPeriod: 5000
-    };
-
-    STATE.mqttClient = mqtt.connect(CONFIG.mqtt.brokerUrl, options);
-
-    // Watchdog timer: If not connected within 5s, start simulation mode
-    STATE.mqttTimeoutTimer = setTimeout(() => {
-      if (!STATE.isMqttConnected) {
-        addLogEntry('MQTT broker connection timed out after 5s. Starting Autonomous Simulation Mode.', 'advisory');
-        startSimulationMode('MQTT Broker Offline');
-      }
-    }, CONFIG.mqtt.connectTimeoutMs);
-
-    // Event: Connect
-    STATE.mqttClient.on('connect', () => {
-      clearTimeout(STATE.mqttTimeoutTimer);
-      STATE.isMqttConnected = true;
-      setConnectionStatus('connected', 'MQTT CONNECTED');
-      addLogEntry(`Connected to MQTT broker. Subscribing to '${CONFIG.mqtt.topic}'`, 'nominal');
-
-      STATE.mqttClient.subscribe(CONFIG.mqtt.topic, (err) => {
-        if (err) {
-          addLogEntry(`Failed to subscribe to topic: ${err.message}`, 'critical');
-        } else {
-          addLogEntry(`Subscribed to topic: ${CONFIG.mqtt.topic}`, 'nominal');
-        }
-      });
-    });
-
-    // Event: Message Received
-    STATE.mqttClient.on('message', (topic, payload) => {
-      try {
-        const messageStr = payload.toString();
-        const data = JSON.parse(messageStr);
-        processTelemetryPayload(data);
-      } catch (err) {
-        addLogEntry(`Payload JSON parse error: ${err.message}`, 'advisory');
-      }
-    });
-
-    // Event: Error
-    STATE.mqttClient.on('error', (err) => {
-      console.warn('MQTT client error:', err);
-      if (!STATE.isSimulationMode) {
-        setConnectionStatus('disconnected', 'BROKER ERROR');
-        addLogEntry(`MQTT socket error: ${err.message || 'Connection failure'}`, 'advisory');
-      }
-    });
-
-    // Event: Offline / Close
-    STATE.mqttClient.on('offline', () => {
-      if (!STATE.isSimulationMode) {
-        setConnectionStatus('connecting', 'RECONNECTING...');
-      }
-    });
-
-  } catch (error) {
-    console.error('MQTT initialization exception:', error);
-    addLogEntry(`MQTT init error: ${error.message}. Engaging simulation.`, 'advisory');
-    startSimulationMode('Library Load Fault');
+function handleLogin() {
+  if (APP.currentRole === 'fleet') {
+    launchFleetManager();
+  } else {
+    launchDriverApp();
   }
 }
 
-/**
- * Update header connection indicator
- */
-function setConnectionStatus(stateClass, text) {
-  if (DOM.mqttStatusDot) {
-    DOM.mqttStatusDot.className = `status-dot ${stateClass}`;
-  }
-  if (DOM.mqttStatusText) {
-    DOM.mqttStatusText.textContent = text;
-  }
+function quickLaunch(role) {
+  selectRole(role);
+  handleLogin();
 }
 
-// ============================================================================
-// 9. AUTONOMOUS SIMULATION MODE (INVESTOR DEMO ENGINE)
-// ============================================================================
+function switchRoleToLogin() {
+  document.getElementById('fleet-view').classList.remove('active-screen');
+  document.getElementById('driver-view').classList.remove('active-screen');
+  document.getElementById('login-screen').classList.add('active-screen');
+}
 
-/**
- * Starts realistic autonomous vehicle telemetry simulation
- */
-function startSimulationMode(reason = 'Demo Mode') {
-  if (STATE.isSimulationMode && STATE.simulationInterval) return;
+function switchToDriverView() {
+  document.getElementById('fleet-view').classList.remove('active-screen');
+  launchDriverApp();
+}
 
-  STATE.isSimulationMode = true;
-  setConnectionStatus('simulation', 'SIMULATION ACTIVE');
+function switchToFleetView() {
+  document.getElementById('driver-view').classList.remove('active-screen');
+  launchFleetManager();
+}
+
+function launchFleetManager() {
+  document.getElementById('login-screen').classList.remove('active-screen');
+  document.getElementById('driver-view').classList.remove('active-screen');
+  document.getElementById('fleet-view').classList.add('active-screen');
   
-  if (DOM.modeToggleBtn) {
-    DOM.modeToggleBtn.classList.add('simulating');
-    if (DOM.modeText) DOM.modeText.textContent = 'SIMULATOR';
-    if (DOM.modeIcon) DOM.modeIcon.className = 'fa-solid fa-microchip';
-  }
-
-  addLogEntry(`Autonomous telemetry simulation engine engaged [${reason}].`, 'system');
-
-  // Realistic Simulation Physics Loop (every 850ms)
-  STATE.simulationInterval = setInterval(() => {
-    generateSimulatedTelemetryTick();
-  }, 850);
+  setTimeout(() => {
+    initFleetManager();
+  }, 100);
 }
 
-/**
- * Stops simulation mode and attempts to rejoin live MQTT
- */
-function stopSimulationMode() {
-  if (!STATE.isSimulationMode) return;
-
-  clearInterval(STATE.simulationInterval);
-  STATE.simulationInterval = null;
-  STATE.isSimulationMode = false;
-
-  if (DOM.modeToggleBtn) {
-    DOM.modeToggleBtn.classList.remove('simulating');
-    if (DOM.modeText) DOM.modeText.textContent = 'LIVE MQTT';
-    if (DOM.modeIcon) DOM.modeIcon.className = 'fa-solid fa-satellite-dish';
-  }
-
-  if (STATE.isMqttConnected) {
-    setConnectionStatus('connected', 'MQTT CONNECTED');
-    addLogEntry('Simulation ended. Restored live MQTT feed.', 'nominal');
-  } else {
-    setConnectionStatus('connecting', 'CONNECTING...');
-    addLogEntry('Simulation ended. Attempting broker handshake...', 'system');
-    initMQTT();
-  }
+function launchDriverApp() {
+  document.getElementById('login-screen').classList.remove('active-screen');
+  document.getElementById('fleet-view').classList.remove('active-screen');
+  document.getElementById('driver-view').classList.add('active-screen');
+  
+  setTimeout(() => {
+    initDriverApp();
+  }, 100);
 }
 
-/**
- * Generates a realistic telemetry frame with engine rpm curves, shifting gears,
- * thermal thermodynamics and natural sensor micro-noise.
- */
-function generateSimulatedTelemetryTick() {
-  const sim = STATE.simPhysics;
-  sim.simTime += 0.85;
-
-  // Handle active injected anomalies
-  if (sim.anomalyActive) {
-    sim.anomalyDuration--;
-    if (sim.anomalyDuration <= 0) {
-      addLogEntry(`Injected condition [${sim.anomalyActive}] resolved. Returning to baseline.`, 'nominal');
-      sim.anomalyActive = null;
-    }
-  }
-
-  // Natural engine speed oscillation and cruise dynamics
-  let targetRpm = 2400;
-  let targetLoad = 42;
-  let targetCoolant = 87 + Math.sin(sim.simTime * 0.05) * 3;
-  let targetOil = targetCoolant + 7.2 + Math.sin(sim.simTime * 0.03) * 1.5;
-  let targetVoltage = 13.85 + (Math.sin(sim.simTime * 0.3) * 0.15);
-  let targetStft = Math.sin(sim.simTime * 0.2) * 2.8 + (Math.random() - 0.5);
-  let targetLtft = 4.1 + (Math.sin(sim.simTime * 0.02) * 0.4);
-  let targetIntake = 34 + Math.round(Math.sin(sim.simTime * 0.01) * 2);
-  let vehicleStatus = 'NOMINAL';
-
-  // Apply Anomaly Injector Overrides
-  if (sim.anomalyActive === 'rev_spike') {
-    targetRpm = 5850 + Math.random() * 200;
-    targetLoad = 88;
-    vehicleStatus = 'ADVISORY';
-  } else if (sim.anomalyActive === 'lean_spike') {
-    targetStft = 14.8 + Math.random() * 1.2;
-    targetLtft = 7.5;
-    targetLoad = 62;
-    vehicleStatus = 'WARNING';
-  } else if (sim.anomalyActive === 'overheat') {
-    targetCoolant = 108.4;
-    targetOil = 118.6;
-    vehicleStatus = 'CRITICAL';
-  } else if (sim.anomalyActive === 'batt_sag') {
-    targetVoltage = 11.2;
-    targetLoad = 70;
-    vehicleStatus = 'WARNING';
-  } else {
-    // Standard driving cycle: subtle gear shifts
-    const cyclePhase = Math.floor(sim.simTime / 12) % 4;
-    if (cyclePhase === 0) {
-      // Gentle Acceleration
-      targetRpm = 2200 + ((sim.simTime % 12) * 120);
-      targetLoad = 55;
-    } else if (cyclePhase === 1) {
-      // Upshift drop
-      targetRpm = 1950 + ((sim.simTime % 12) * 40);
-      targetLoad = 38;
-    } else if (cyclePhase === 2) {
-      // Steady High-speed Highway Cruise
-      targetRpm = 2450 + (Math.random() - 0.5) * 40;
-      targetLoad = 44;
-    } else {
-      // Deceleration / coasting
-      targetRpm = 1450 + (Math.random() - 0.5) * 60;
-      targetLoad = 18;
-    }
-  }
-
-  // Construct Synthetic Payload
-  const payload = {
-    rpm: Math.round(targetRpm),
-    coolant_temp: Number(targetCoolant.toFixed(1)),
-    oil_temp: Number(targetOil.toFixed(1)),
-    battery_voltage: Number(targetVoltage.toFixed(1)),
-    engine_load: Math.round(targetLoad),
-    stft: Number(targetStft.toFixed(1)),
-    ltft: Number(targetLtft.toFixed(1)),
-    intake_air_temp: targetIntake,
-    status: vehicleStatus,
-    vehicle_id: 'KA-TRUCK-001',
-    timestamp: Date.now()
-  };
-
-  // Dispatch into normal ingestion pipeline
-  processTelemetryPayload(payload);
-}
-
-/**
- * Trigger deliberate anomalies for live investor presentations
- */
-function triggerAnomaly(type) {
-  playChime('click');
-  initAudio();
-
-  STATE.simPhysics.anomalyActive = type;
-  STATE.simPhysics.anomalyDuration = 14; // Frames
-
-  if (type === 'rev_spike') {
-    addLogEntry('[ANOMALY INJECTED] High RPM transient throttle blip (5,800 RPM). Near redline.', 'advisory');
-  } else if (type === 'lean_spike') {
-    addLogEntry('[CRITICAL ANOMALY INJECTED] Bank 1 STFT spike (+14.8%). Lean fuel mixture fault detected!', 'anomaly');
-  } else if (type === 'overheat') {
-    addLogEntry('[CRITICAL ANOMALY INJECTED] Coolant temperature surged to 108°C! Thermostat restriction alert.', 'critical');
-  } else if (type === 'batt_sag') {
-    addLogEntry('[ANOMALY INJECTED] Alternator rail sag (11.2V). Insufficient battery charging voltage.', 'anomaly');
-  }
-}
-
-/**
- * Restores nominal cruise
- */
-function resetToNominal() {
-  playChime('click');
-  STATE.simPhysics.anomalyActive = null;
-  STATE.simPhysics.anomalyDuration = 0;
-  addLogEntry('[SYSTEM RESET] Vehicle telemetry restored to baseline nominal operating parameters.', 'nominal');
-}
-
-// ============================================================================
-// 10. USER INTERACTION & EVENT LISTENERS
-// ============================================================================
-
-function attachEventListeners() {
-  // Mode Switch Button (Live MQTT <-> Simulator)
-  if (DOM.modeToggleBtn) {
-    DOM.modeToggleBtn.addEventListener('click', () => {
-      playChime('click');
-      if (STATE.isSimulationMode) {
-        stopSimulationMode();
-      } else {
-        startSimulationMode('User Requested');
-      }
-    });
-  }
-
-  // Audio Toggle Button
-  if (DOM.audioToggleBtn) {
-    DOM.audioToggleBtn.addEventListener('click', () => {
-      initAudio();
-      STATE.audioEnabled = !STATE.audioEnabled;
-      if (STATE.audioEnabled) {
-        DOM.audioToggleBtn.classList.add('active');
-        if (DOM.audioIcon) DOM.audioIcon.className = 'fa-solid fa-volume-high';
-        playChime('nominal');
-        addLogEntry('Acoustic telemetry synthesizer enabled.', 'system');
-      } else {
-        DOM.audioToggleBtn.classList.remove('active');
-        if (DOM.audioIcon) DOM.audioIcon.className = 'fa-solid fa-volume-xmark';
-      }
-    });
-  }
-
-  // Clear Activity Feed
-  if (DOM.clearLogBtn) {
-    DOM.clearLogBtn.addEventListener('click', () => {
-      playChime('click');
-      if (DOM.activityFeed) {
-        DOM.activityFeed.innerHTML = '';
-      }
-      if (DOM.logCountBadge) {
-        DOM.logCountBadge.textContent = '0 EVENTS';
-      }
-    });
-  }
-
-  // Toggle Auto-Scroll
-  if (DOM.pauseScrollBtn) {
-    DOM.pauseScrollBtn.addEventListener('click', () => {
-      playChime('click');
-      STATE.autoScrollEnabled = !STATE.autoScrollEnabled;
-      if (STATE.autoScrollEnabled) {
-        if (DOM.pauseScrollText) DOM.pauseScrollText.textContent = 'Auto-Scroll ON';
-        if (DOM.pauseScrollIcon) DOM.pauseScrollIcon.className = 'fa-solid fa-angles-down';
-      } else {
-        if (DOM.pauseScrollText) DOM.pauseScrollText.textContent = 'Auto-Scroll PAUSED';
-        if (DOM.pauseScrollIcon) DOM.pauseScrollIcon.className = 'fa-solid fa-pause';
-      }
-    });
-  }
-
-  // Demo Injector Buttons
-  if (DOM.injectRevBtn) {
-    DOM.injectRevBtn.addEventListener('click', () => triggerAnomaly('rev_spike'));
-  }
-  if (DOM.injectLeanBtn) {
-    DOM.injectLeanBtn.addEventListener('click', () => triggerAnomaly('lean_spike'));
-  }
-  if (DOM.injectOverheatBtn) {
-    DOM.injectOverheatBtn.addEventListener('click', () => triggerAnomaly('overheat'));
-  }
-  if (DOM.injectBattSagBtn) {
-    DOM.injectBattSagBtn.addEventListener('click', () => triggerAnomaly('batt_sag'));
-  }
-  if (DOM.restoreNominalBtn) {
-    DOM.restoreNominalBtn.addEventListener('click', () => resetToNominal());
-  }
-
-  // Digital Clock Updater (every second)
+// Global UTC Clock
+function initClock() {
   setInterval(() => {
-    if (DOM.digitalClock) {
-      const now = new Date();
-      DOM.digitalClock.textContent = now.toUTCString().split(' ')[4] + ' UTC';
-    }
+    const now = new Date();
+    const timeStr = now.toISOString().substring(11, 19);
+    const clockEl = document.getElementById('fm-clock');
+    if (clockEl) clockEl.innerText = timeStr;
   }, 1000);
 }
 
-// ============================================================================
-// 11. APPLICATION BOOTSTRAP
-// ============================================================================
+// Audio Synthesizer (880Hz / 659Hz Dual-Tone Chime)
+function playAudioChime() {
+  if (!APP.audioEnabled) return;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!APP.audioCtx) APP.audioCtx = new AudioCtx();
+    
+    const now = APP.audioCtx.currentTime;
+    
+    // Tone 1: 880 Hz (A5)
+    const osc1 = APP.audioCtx.createOscillator();
+    const gain1 = APP.audioCtx.createGain();
+    osc1.frequency.setValueAtTime(880, now);
+    gain1.gain.setValueAtTime(0.15, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc1.connect(gain1);
+    gain1.connect(APP.audioCtx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.35);
 
-window.addEventListener('DOMContentLoaded', () => {
-  console.log('[Kolls Autotronics] Dashboard Core Initializing...');
+    // Tone 2: 659 Hz (E5)
+    const osc2 = APP.audioCtx.createOscillator();
+    const gain2 = APP.audioCtx.createGain();
+    osc2.frequency.setValueAtTime(659, now + 0.08);
+    gain2.gain.setValueAtTime(0.12, now + 0.08);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    osc2.connect(gain2);
+    gain2.connect(APP.audioCtx.destination);
+    osc2.start(now + 0.08);
+    osc2.stop(now + 0.45);
+  } catch (e) {
+    console.log('Audio chime error:', e);
+  }
+}
 
-  // 1. Initialize Visualizers
-  initCharts();
+function toggleAudioChimes() {
+  APP.audioEnabled = !APP.audioEnabled;
+  const btn = document.getElementById('fm-audio-btn');
+  if (APP.audioEnabled) {
+    btn.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+    btn.style.color = 'var(--accent-cyan)';
+    playAudioChime();
+  } else {
+    btn.innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+    btn.style.color = 'var(--text-muted)';
+  }
+}
 
-  // 2. Attach UI Handlers
-  attachEventListeners();
+// ==============================================================================
+// 2. FLEET MANAGER SOFTWARE APP (AEGIS COMMAND CENTER)
+// ==============================================================================
 
-  // 3. Populate Initial Baseline Readings
-  processTelemetryPayload(STATE.telemetry);
+function initFleetManager() {
+  renderTriageQueue('all');
+  initLeafletMap();
+  openInspector('402'); // Open Truck #402 by default
+  startFleetSimulationLoop();
+  
+  // Trigger sample high-priority toast after 6 seconds for pitch demo
+  setTimeout(() => {
+    triggerCriticalToast(APP.trucks[1]); // Truck #612 Hub Bearing Toast
+  }, 6000);
+}
 
-  // 4. Seed Activity Feed with System Boot Logs
-  addLogEntry('Kolls Autotronics AI Vehicle Health Monitoring Core online.', 'system');
-  addLogEntry('Neural model LAMBDA-PREDICT v2.8 loaded. Closed-loop monitoring active.', 'nominal');
-  addLogEntry('Calibrated SAE J1979 CAN-bus telemetry interface initialized.', 'nominal');
+// Zone 2: Render Triage Queue
+function renderTriageQueue(filter = 'all', searchTerm = '') {
+  const container = document.getElementById('fm-triage-list');
+  if (!container) return;
+  
+  let list = [...APP.trucks];
+  
+  // Apply category filter
+  if (filter !== 'all') {
+    list = list.filter(t => t.severity === filter);
+  }
 
-  // 5. Connect to MQTT Broker (HiveMQ WebSockets)
-  initMQTT();
-});
+  // Apply search query
+  if (searchTerm) {
+    const q = searchTerm.toLowerCase();
+    list = list.filter(t => 
+      t.id.toLowerCase().includes(q) ||
+      t.driver.toLowerCase().includes(q) ||
+      t.vin.toLowerCase().includes(q) ||
+      t.problem.toLowerCase().includes(q)
+    );
+  }
+
+  // Priority Sort: Critical (lowest RUL first) -> Warning -> Scheduled
+  list.sort((a, b) => a.rulHours - b.rulHours);
+
+  container.innerHTML = list.map(truck => {
+    let rulClass = 'rul-warn';
+    let cardClass = 'warning';
+    if (truck.severity === 'critical') {
+      rulClass = 'rul-crit';
+      cardClass = 'critical';
+    } else if (truck.severity === 'scheduled') {
+      rulClass = 'rul-sched';
+      cardClass = 'scheduled';
+    }
+
+    return `
+      <div class="triage-card ${cardClass}" onclick="inspectTruck('${truck.id}')" id="tcard-${truck.id}">
+        <div class="tcard-top">
+          <span class="tcard-truck"><i class="fa-solid fa-truck"></i> TRUCK #${truck.id}</span>
+          <span class="tcard-rul ${rulClass}"><i class="fa-solid fa-clock"></i> RUL: ${truck.rulHours.toFixed(1)}h</span>
+        </div>
+        <div class="tcard-problem">${truck.problem}</div>
+        <div class="tcard-impact">${truck.impact}</div>
+        <div class="tcard-footer">
+          <span class="tcard-subsystem"><i class="fa-solid fa-microchip"></i> ${truck.subsystem}</span>
+          <button class="btn-inspect-pill" onclick="event.stopPropagation(); inspectTruck('${truck.id}')">
+            INSPECT ASSET <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterTriage(category) {
+  document.querySelectorAll('.triage-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-filter') === category);
+  });
+  renderTriageQueue(category);
+}
+
+function handleFleetSearch(query) {
+  renderTriageQueue('all', query);
+}
+
+// Zone 3: Geospatial Leaflet Map
+function initLeafletMap() {
+  if (APP.map) return; // Prevent re-initialization
+
+  const mapContainer = document.getElementById('fm-map');
+  if (!mapContainer) return;
+
+  // Center on Midwest I-80 corridor (Des Moines, IA)
+  APP.map = L.map('fm-map', {
+    zoomControl: false,
+    attributionControl: false
+  }).setView([41.65, -92.5], 8);
+
+  // CartoDB Dark Matter Vector Tiles
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd'
+  }).addTo(APP.map);
+
+  // Zoom control on bottom right
+  L.control.zoom({ position: 'bottomright' }).addTo(APP.map);
+
+  // Render Service Hub Depots (Geofences)
+  renderDepotGeofences();
+
+  // Render Trucks on Map
+  renderTruckMarkers();
+}
+
+function renderDepotGeofences() {
+  const depots = [
+    { name: 'Des Moines Logistics Hub (Exit 137)', lat: 41.5868, lng: -93.6250, radius: 4500 },
+    { name: 'Iowa City Regional Maintenance', lat: 41.6611, lng: -91.5302, radius: 3500 },
+    { name: 'Cedar Rapids Freight Depot', lat: 41.9779, lng: -91.6656, radius: 3000 },
+    { name: 'Davenport Riverfront Terminal', lat: 41.5236, lng: -90.5776, radius: 4000 }
+  ];
+
+  depots.forEach(depot => {
+    const circle = L.circle([depot.lat, depot.lng], {
+      color: '#00d4ff',
+      fillColor: '#00d4ff',
+      fillOpacity: 0.08,
+      weight: 1.5,
+      dashArray: '4, 4',
+      radius: depot.radius
+    }).addTo(APP.map);
+
+    circle.bindTooltip(`🏢 ${depot.name}`, { permanent: false, direction: 'top', className: 'map-tooltip' });
+    APP.depotCircles.push(circle);
+  });
+}
+
+function renderTruckMarkers() {
+  APP.trucks.forEach(truck => {
+    let pinColor = 'pin-green';
+    let iconSymbol = 'fa-arrow-up';
+    if (truck.severity === 'critical') {
+      pinColor = 'pin-red';
+      iconSymbol = 'fa-triangle-exclamation';
+    } else if (truck.severity === 'warning') {
+      pinColor = 'pin-yellow';
+      iconSymbol = 'fa-circle-exclamation';
+    }
+
+    // Custom HTML Marker with Directional Heading Rotation
+    const customIcon = L.divIcon({
+      className: 'truck-marker-icon',
+      html: `
+        <div class="truck-pin ${pinColor}" style="transform: rotate(${truck.headingDeg}deg);">
+          <i class="fa-solid ${iconSymbol}"></i>
+        </div>
+      `,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
+    });
+
+    const marker = L.marker([truck.lat, truck.lng], { icon: customIcon }).addTo(APP.map);
+    
+    marker.on('click', () => {
+      inspectTruck(truck.id);
+    });
+
+    marker.bindPopup(`
+      <div style="font-family: monospace; color: #fff; background: #111827; padding: 6px; border-radius: 4px;">
+        <strong style="color: #00d4ff;">TRUCK #${truck.id}</strong><br>
+        Driver: ${truck.driver}<br>
+        Speed: ${truck.speed} MPH (${truck.heading})<br>
+        Status: <span style="color: ${truck.severity === 'critical' ? '#ff3344' : '#00ff88'};">${truck.severity.toUpperCase()}</span>
+      </div>
+    `);
+
+    APP.markers[truck.id] = marker;
+  });
+}
+
+function toggleMapLayer(layer) {
+  if (layer === 'depots') {
+    const toggle = document.getElementById('layer-depots-toggle').checked;
+    APP.depotCircles.forEach(circle => {
+      if (toggle) circle.addTo(APP.map);
+      else APP.map.removeLayer(circle);
+    });
+  }
+}
+
+// Zone 4: Deep Asset Inspector Drawer
+function inspectTruck(truckId) {
+  APP.selectedTruckId = truckId;
+  const truck = APP.trucks.find(t => t.id === truckId);
+  if (!truck) return;
+
+  // Center map on this truck
+  if (APP.map && APP.markers[truckId]) {
+    APP.map.panTo([truck.lat, truck.lng], { animate: true, duration: 0.8 });
+    APP.markers[truckId].openPopup();
+  }
+
+  // Populate Header Data
+  document.getElementById('insp-truck-id').innerText = `TRUCK #${truck.id}`;
+  document.getElementById('insp-driver').innerText = truck.driver;
+  document.getElementById('insp-vin').innerText = truck.vin;
+  document.getElementById('insp-voltage').innerText = `${truck.voltage.toFixed(1)}V`;
+  document.getElementById('insp-location').innerText = truck.location;
+  document.getElementById('insp-speed').innerText = `${truck.speed} MPH`;
+  document.getElementById('insp-heading').innerText = truck.heading;
+
+  // Status Badge
+  const statusBadge = document.getElementById('insp-status-badge');
+  if (truck.severity === 'critical') {
+    statusBadge.className = 'truck-status-badge status-crit';
+    statusBadge.innerText = 'CRITICAL ALERT';
+  } else if (truck.severity === 'warning') {
+    statusBadge.className = 'truck-status-badge status-warn';
+    statusBadge.innerText = 'WARNING ADVISORY';
+  } else {
+    statusBadge.className = 'truck-status-badge status-ok';
+    statusBadge.innerText = 'NOMINAL';
+  }
+
+  // Tab 1: AI Diagnostics
+  document.getElementById('diag-powertrain-val').innerText = `${truck.subsystemScores.powertrain}% ${truck.subsystemScores.powertrain < 80 ? 'Warning' : 'Nominal'}`;
+  document.getElementById('diag-powertrain').style.width = `${truck.subsystemScores.powertrain}%`;
+
+  document.getElementById('diag-electrical-val').innerText = `${truck.subsystemScores.electrical}% ${truck.subsystemScores.electrical < 50 ? 'Critical Alert' : 'Nominal'}`;
+  document.getElementById('diag-electrical').style.width = `${truck.subsystemScores.electrical}%`;
+
+  document.getElementById('diag-brakes-val').innerText = `${truck.subsystemScores.brakes}% Nominal`;
+  document.getElementById('diag-brakes').style.width = `${truck.subsystemScores.brakes}%`;
+
+  document.getElementById('diag-transmission-val').innerText = `${truck.subsystemScores.transmission}% Nominal`;
+  document.getElementById('diag-transmission').style.width = `${truck.subsystemScores.transmission}%`;
+
+  document.getElementById('diag-rul-val').innerText = `${truck.rulHours.toFixed(1)} Hours remaining`;
+
+  // Render Vibration Spectrum Chart
+  renderVibrationChart(truck.vibrationFreq);
+
+  // Tab 2: Live Telemetry
+  document.getElementById('tele-rpm').innerText = truck.telemetry.rpm;
+  document.getElementById('tele-coolant').innerText = truck.telemetry.coolantF;
+  document.getElementById('tele-oil-press').innerText = truck.telemetry.oilPressPsi;
+  document.getElementById('tele-fuel-burn').innerText = truck.telemetry.fuelGph;
+  document.getElementById('tele-def').innerText = `${truck.telemetry.defPct}%`;
+  document.getElementById('tele-boost').innerText = truck.telemetry.boostPsi;
+
+  // Populate 18-Wheel TPMS
+  truck.tpms.forEach((psi, idx) => {
+    const tireEl = document.getElementById(`tire-${idx + 1}`);
+    if (tireEl) {
+      tireEl.querySelector('.t-psi').innerText = psi;
+      tireEl.className = psi < 95 ? 'tire-node crit' : (psi < 100 ? 'tire-node warn' : 'tire-node ok');
+    }
+  });
+
+  // Tab 3: Driver & HOS
+  document.getElementById('driver-full-name').innerText = truck.driver;
+  document.getElementById('driver-safety-score').innerText = truck.safetyScore;
+  document.getElementById('hos-drive-used').innerText = truck.hos.driveUsed;
+  document.getElementById('hos-shift-used').innerText = truck.hos.shiftUsed;
+  document.getElementById('hos-weekly-used').innerText = truck.hos.weeklyUsed;
+
+  // Tab 4: Work Order
+  document.getElementById('wo-title').innerText = `Emergency Work Order #${truck.workOrder.id}`;
+  document.getElementById('wo-hub').innerText = truck.workOrder.hub;
+  document.getElementById('wo-bay').innerText = truck.workOrder.bay;
+  document.getElementById('wo-tech').innerText = truck.workOrder.tech;
+  document.getElementById('wo-downtime').innerText = truck.workOrder.downtime;
+  document.getElementById('wo-status-pill').innerText = truck.workOrder.status;
+
+  // Slide drawer open
+  document.getElementById('fm-inspector').classList.add('open');
+  APP.inspectorOpen = true;
+}
+
+function closeInspector() {
+  document.getElementById('fm-inspector').classList.remove('open');
+  APP.inspectorOpen = false;
+}
+
+function switchInspectorTab(tabId) {
+  // Update Tab Buttons
+  document.querySelectorAll('#insp-tabs .tab-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  event.currentTarget.classList.add('active');
+
+  // Update Tab Panels
+  document.querySelectorAll('.drawer-tab-content .tab-panel').forEach(panel => {
+    panel.classList.remove('active');
+  });
+  document.getElementById(`insp-tab-${tabId}`).classList.add('active');
+}
+
+// Vibration Spectrum FFT Chart (Chart.js)
+function renderVibrationChart(peakFreq = 120) {
+  const ctx = document.getElementById('diag-vibration-chart');
+  if (!ctx) return;
+
+  if (APP.charts.vibration) {
+    APP.charts.vibration.destroy();
+  }
+
+  // Generate Frequency Data (0 to 300 Hz)
+  const labels = [];
+  const baselineData = [];
+  const abnormalData = [];
+
+  for (let f = 10; f <= 250; f += 10) {
+    labels.push(`${f}Hz`);
+    // Baseline smooth curve
+    baselineData.push(1.2 + Math.sin(f / 30) * 0.4);
+
+    // Abnormal curve with sharp resonant spike at peakFreq
+    let spike = 0;
+    if (Math.abs(f - peakFreq) <= 15) {
+      spike = 5.8 - Math.abs(f - peakFreq) * 0.25;
+    }
+    abnormalData.push(spike > 0 ? spike : 1.3 + Math.random() * 0.3);
+  }
+
+  APP.charts.vibration = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Normal Baseline Tolerance',
+          data: baselineData,
+          borderColor: '#5f6e8c',
+          borderWidth: 1.5,
+          borderDash: [4, 4],
+          pointRadius: 0,
+          fill: false
+        },
+        {
+          label: 'Live Harmonic Vibration Sensor (120Hz Bearing Spike)',
+          data: abnormalData,
+          borderColor: '#ff3344',
+          borderWidth: 2.5,
+          backgroundColor: 'rgba(255, 51, 68, 0.15)',
+          fill: true,
+          pointRadius: abnormalData.map(v => v > 4 ? 4 : 0),
+          pointBackgroundColor: '#ff3344'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#9aa7c0', font: { size: 10 } } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#5f6e8c', font: { size: 9 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#5f6e8c', font: { size: 9 } } }
+      }
+    }
+  });
+}
+
+// Zone 4 Actions: 2-Minute Live Oscilloscope Test
+function startLiveInspect() {
+  document.getElementById('inspect-modal').classList.add('open');
+  APP.oscilloscopeTimer = 120;
+  
+  const canvas = document.getElementById('oscilloscope-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.parentElement.clientWidth;
+  
+  if (APP.oscilloscopeInterval) clearInterval(APP.oscilloscopeInterval);
+
+  let phase = 0;
+  APP.oscilloscopeInterval = setInterval(() => {
+    APP.oscilloscopeTimer--;
+    const mins = Math.floor(APP.oscilloscopeTimer / 60);
+    const secs = APP.oscilloscopeTimer % 60;
+    document.getElementById('inspect-countdown').innerText = 
+      `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+    if (APP.oscilloscopeTimer <= 0) {
+      clearInterval(APP.oscilloscopeInterval);
+    }
+
+    // Draw Oscilloscope Waveform on Canvas
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Green CRT Grid
+    ctx.strokeStyle = 'rgba(0, 212, 255, 0.1)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 30) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 30) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
+    // Oscilloscope Cyan Waveform
+    ctx.strokeStyle = '#00d4ff';
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#00d4ff';
+    ctx.beginPath();
+    
+    phase += 0.15;
+    for (let x = 0; x < canvas.width; x++) {
+      const y = canvas.height / 2 + 
+                Math.sin(x * 0.05 + phase) * 35 + 
+                Math.sin(x * 0.12 - phase * 2) * 15 + 
+                (Math.random() - 0.5) * 4;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }, 1000 / 30);
+}
+
+function closeLiveInspectModal() {
+  document.getElementById('inspect-modal').classList.remove('open');
+  if (APP.oscilloscopeInterval) clearInterval(APP.oscilloscopeInterval);
+}
+
+// Zone 4 Actions: SMS Dispatcher Dialog
+function openSMSDialog() {
+  document.getElementById('sms-modal').classList.add('open');
+}
+function closeSMSModal() {
+  document.getElementById('sms-modal').classList.remove('open');
+}
+function fillSMSTemplate(num) {
+  const input = document.getElementById('sms-text-input');
+  if (num === 1) input.value = "REROUTE ADVISORY: Alternator bearing alert. Divert to Des Moines Logistics Hub (Exit 137). Bay 3 & Master Tech Marcus Vance pre-staged.";
+  if (num === 2) input.value = "SPEED REDUCTION ADVISORY: Reduce highway speed to 55 MPH immediately to mitigate bearing thermal rise until next exit.";
+  if (num === 3) input.value = "SAFE HARBOR NOTICE: Pull over safely at Love's Travel Stop (Exit 182). Mobile field rescue unit dispatched.";
+}
+function sendSMSToDriver() {
+  closeSMSModal();
+  triggerToastSimple("IN-CAB TRANSMISSION SENT", "Reroute instructions successfully dispatched to Driver in-cab telematics terminal.", "green");
+}
+
+// Zone 4 Actions: Generate 1-Click Work Order
+function generateOneClickWorkOrder() {
+  const truck = APP.trucks.find(t => t.id === APP.selectedTruckId);
+  if (!truck) return;
+  truck.workOrder.status = "DISPATCHED TO BAY 3";
+  document.getElementById('wo-status-pill').className = "badge-status-green";
+  document.getElementById('wo-status-pill').innerText = "DISPATCHED TO BAY 3";
+  
+  // Switch to Work Order Tab
+  switchInspectorTab('workorder');
+  triggerToastSimple("WORK ORDER DISPATCHED", `Work order #${truck.workOrder.id} dispatched to ${truck.workOrder.hub} with OEM parts reserved.`, "green");
+}
+
+// Automated Critical Pop-Up Notification System (Top-Right Toast Banner)
+function triggerCriticalToast(truck) {
+  playAudioChime();
+
+  const container = document.getElementById('fm-toast-container');
+  if (!container) return;
+
+  const toastId = `toast-${Date.now()}`;
+  const toastEl = document.createElement('div');
+  toastEl.className = 'toast-alert';
+  toastEl.id = toastId;
+
+  toastEl.innerHTML = `
+    <div class="toast-header">
+      <div class="toast-beacon">
+        <span class="radar-pulse"></span>
+        <span>HIGHWAY MECHANICAL EMERGENCY</span>
+      </div>
+      <button onclick="dismissToast('${toastId}')" style="background:none; border:none; color:#5f6e8c; cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="toast-body">
+      <h4>TRUCK #${truck.id} (${truck.driver})</h4>
+      <p><strong>${truck.problem}</strong> on ${truck.location}. Imminent breakdown risk!</p>
+    </div>
+    <div class="toast-actions">
+      <span class="toast-rul"><i class="fa-solid fa-hourglass-half"></i> RUL: ${truck.rulHours.toFixed(1)} Hours</span>
+      <button class="toast-btn" onclick="inspectTruck('${truck.id}'); dismissToast('${toastId}');">
+        INSPECT ASSET
+      </button>
+    </div>
+    <div class="toast-progress" id="progress-${toastId}"></div>
+  `;
+
+  container.appendChild(toastEl);
+
+  // 8-Second Hover-to-Pause Countdown Bar
+  let remainingMs = 8000;
+  let isPaused = false;
+  const progressEl = document.getElementById(`progress-${toastId}`);
+
+  toastEl.addEventListener('mouseenter', () => { isPaused = true; });
+  toastEl.addEventListener('mouseleave', () => { isPaused = false; });
+
+  const interval = setInterval(() => {
+    if (!isPaused) {
+      remainingMs -= 100;
+      if (progressEl) progressEl.style.width = `${(remainingMs / 8000) * 100}%`;
+      if (remainingMs <= 0) {
+        clearInterval(interval);
+        dismissToast(toastId);
+      }
+    }
+  }, 100);
+}
+
+function dismissToast(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function triggerToastSimple(title, body, color = "green") {
+  const container = document.getElementById('fm-toast-container');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = 'toast-alert';
+  toast.style.borderColor = color === "green" ? "#00ff88" : "#00d4ff";
+  toast.style.borderLeftColor = color === "green" ? "#00ff88" : "#00d4ff";
+  toast.innerHTML = `
+    <div class="toast-body">
+      <h4 style="color: ${color === "green" ? "#00ff88" : "#00d4ff"};">${title}</h4>
+      <p>${body}</p>
+    </div>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+
+// Background Simulation Loop for Fleet Mode
+function startFleetSimulationLoop() {
+  setInterval(() => {
+    // Slightly nudge truck coordinates to simulate motion along I-80
+    APP.trucks.forEach(truck => {
+      // Decrement RUL countdown timers gradually
+      truck.rulHours = Math.max(0.1, truck.rulHours - 0.005);
+
+      // Micro-telemetry fluctuations
+      truck.telemetry.rpm += Math.floor(Math.random() * 20 - 10);
+      truck.voltage = 13.8 + (Math.random() * 0.2 - 0.1);
+
+      // Move markers slightly
+      if (APP.markers[truck.id]) {
+        truck.lat += (Math.random() - 0.5) * 0.0008;
+        truck.lng += (truck.headingDeg > 180 ? -1 : 1) * 0.0006;
+        APP.markers[truck.id].setLatLng([truck.lat, truck.lng]);
+      }
+    });
+
+    // Refresh RUL labels on Triage list
+    APP.trucks.forEach(truck => {
+      const card = document.getElementById(`tcard-${truck.id}`);
+      if (card) {
+        const rulEl = card.querySelector('.tcard-rul');
+        if (rulEl) rulEl.innerHTML = `<i class="fa-solid fa-clock"></i> RUL: ${truck.rulHours.toFixed(1)}h`;
+      }
+    });
+  }, 3000);
+}
+
+// ==============================================================================
+// 3. DRIVER SOFTWARE APP (IN-CAB PERSONAL VEHICLE INTELLIGENCE)
+// ==============================================================================
+
+function initDriverApp() {
+  renderConsumables();
+  renderPidTable();
+  initDriverCharts();
+  startDriverSimulationLoop();
+}
+
+function switchDriverScreen(screenId) {
+  APP.currentDriverScreen = screenId;
+
+  // Bottom Nav active state
+  document.querySelectorAll('#driver-nav .d-nav-item').forEach(item => {
+    item.classList.remove('active');
+  });
+  event.currentTarget.classList.add('active');
+
+  // Sub-screen visibility
+  document.querySelectorAll('.driver-sub-screen').forEach(screen => {
+    screen.classList.remove('active-sub-screen');
+  });
+  document.getElementById(`driver-tab-${screenId}`).classList.add('active-sub-screen');
+}
+
+// Screen B: 1-Click Fix Simulation (Financial Avoidance Engine)
+function simulateFixAlert(alertId) {
+  playAudioChime();
+  const card = document.getElementById(`alert-card-${alertId}`);
+  if (card) {
+    card.style.transition = 'all 0.5s ease';
+    card.style.opacity = '0';
+    card.style.transform = 'scale(0.95)';
+    setTimeout(() => {
+      card.remove();
+      // Animate Master Health Rating Upward!
+      let currentScore = parseInt(document.getElementById('driver-health-number').innerText);
+      currentScore = Math.min(100, currentScore + 4);
+      document.getElementById('driver-health-number').innerText = currentScore;
+      document.getElementById('driver-health-gauge').setAttribute('stroke-dasharray', `${currentScore}, 100`);
+      
+      triggerToastSimple("PROACTIVE REPAIR RESOLVED", `Vehicle Health Score increased to ${currentScore}/100. Avoided catastrophic secondary damage!`, "green");
+    }, 500);
+  }
+}
+
+// Screen C: Predictive Maintenance (Driving Style Wear Simulator)
+function setDrivingStyle(style) {
+  APP.drivingStyle = style;
+  document.getElementById('style-severe').classList.toggle('active', style === 'severe');
+  document.getElementById('style-urban').classList.toggle('active', style === 'urban');
+  document.getElementById('style-highway').classList.toggle('active', style === 'highway');
+
+  renderConsumables();
+}
+
+function renderConsumables() {
+  const container = document.getElementById('consumables-container');
+  if (!container) return;
+
+  // Multiplier based on driving style
+  let multiplier = 1.0;
+  if (APP.drivingStyle === 'severe') multiplier = 0.55; // 45% shorter life
+  if (APP.drivingStyle === 'urban') multiplier = 0.77;  // 23% shorter life
+
+  const c = APP.driverConsumables;
+  const items = [
+    { title: 'Motor Oil Life', remaining: Math.round((c.oil.baseLimitKm - c.oil.currentKm) * multiplier), unit: 'km remaining', pct: Math.round(52 * multiplier) },
+    { title: 'Front Brake Pads', remaining: (c.brakes.currentMm * multiplier).toFixed(1), unit: 'mm remaining', pct: Math.round((c.brakes.currentMm / c.brakes.baseLimitMm) * 100 * multiplier) },
+    { title: 'Tire Tread Geometry', remaining: Math.round(c.tires.currentPct * multiplier), unit: '% remaining', pct: Math.round(c.tires.currentPct * multiplier) },
+    { title: 'Spark / Glow Plugs', remaining: Math.round((c.plugs.baseLimitKm - c.plugs.currentKm) * multiplier), unit: 'km remaining', pct: Math.round(60 * multiplier) },
+    { title: 'Coolant Purity', remaining: Math.round(c.coolant.currentPct * multiplier), unit: '% integrity', pct: Math.round(c.coolant.currentPct * multiplier) },
+    { title: 'Transmission Fluid', remaining: Math.round(c.trans.currentPct * multiplier), unit: '% viscosity', pct: Math.round(c.trans.currentPct * multiplier) }
+  ];
+
+  container.innerHTML = items.map(item => `
+    <div class="consumable-card">
+      <div class="con-top">
+        <span>${item.title}</span>
+        <strong class="${item.pct < 40 ? 'text-yellow' : 'text-green'}">${item.pct}%</strong>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill ${item.pct < 40 ? 'fill-yellow' : 'fill-green'}" style="width: ${item.pct}%"></div>
+      </div>
+      <span class="con-countdown"><i class="fa-solid fa-hourglass-half"></i> ${item.remaining} ${item.unit}</span>
+    </div>
+  `).join('');
+}
+
+// Screen D: AI Diagnostic Copilot (Virtual Master Mechanic Chat)
+function askCopilot(question) {
+  document.getElementById('copilot-input').value = question;
+  sendCopilotMessage();
+}
+
+function handleCopilotKey(e) {
+  if (e.key === 'Enter') sendCopilotMessage();
+}
+
+function sendCopilotMessage() {
+  const input = document.getElementById('copilot-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const stream = document.getElementById('copilot-msg-stream');
+
+  // Append User Bubble
+  const userMsg = document.createElement('div');
+  userMsg.className = 'chat-msg user-msg';
+  userMsg.innerHTML = `
+    <div class="msg-avatar"><i class="fa-solid fa-user"></i></div>
+    <div class="msg-content">
+      <p>${text}</p>
+      <span class="msg-timestamp">Just now</span>
+    </div>
+  `;
+  stream.appendChild(userMsg);
+  input.value = '';
+  stream.scrollTop = stream.scrollHeight;
+
+  // Simulate AI Thinking Delay
+  setTimeout(() => {
+    let reply = "I've cross-referenced your vehicle's live CAN bus telemetry. All secondary cylinder pressures are nominal.";
+    
+    if (text.toLowerCase().includes('engine') || text.toLowerCase().includes('hot') || text.toLowerCase().includes('104')) {
+      reply = "💡 <strong>Diagnosis:</strong> Your engine is currently at 104°C (safe limit is 98°C). This is an early thermostat stickiness issue. <em>Analogy:</em> It's like a home furnace damper that only opens halfway. You can safely drive another 45 km to your destination, but swap the $20 thermostat before next week to avoid a $1,850 head gasket warp.";
+    } else if (text.toLowerCase().includes('brake') || text.toLowerCase().includes('pad')) {
+      reply = "🛑 <strong>Brake Health:</strong> Your front pads measure 2.7mm. Safe legal minimum is 1.5mm. You have approximately 1,200 km of normal driving left. If you replace them now for ~$180, you save the rotors. If you wait until they grind metal-on-metal, you'll need $650 in new rotors.";
+    } else if (text.toLowerCase().includes('fuel trim') || text.toLowerCase().includes('trim')) {
+      reply = "💨 <strong>Fuel Trim:</strong> Your Long-Term Fuel Trim (LTFT) is at +14.2%. This means the engine computer is squirting 14% extra fuel to compensate for unmetered air entering via a cracked vacuum hose. It wastes ~$850/year in diesel if unaddressed.";
+    } else if (text.toLowerCase().includes('battery') || text.toLowerCase().includes('alternator')) {
+      reply = "⚡ <strong>Electrical System:</strong> Your bus voltage is 13.8V with 880 CCA cold-cranking capacity. The alternator is charging properly, but harmonic sensors show slight bearing wear that should be inspected at your next scheduled 10,000 km service.";
+    }
+
+    const aiMsg = document.createElement('div');
+    aiMsg.className = 'chat-msg ai-msg';
+    aiMsg.innerHTML = `
+      <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
+      <div class="msg-content">
+        <p>${reply}</p>
+        <span class="msg-timestamp">Grounded in 50Hz live CAN bus stream</span>
+      </div>
+    `;
+    stream.appendChild(aiMsg);
+    stream.scrollTop = stream.scrollHeight;
+  }, 900);
+}
+
+// Screen F: Live CAN Bus Charts & PID Table
+function initDriverCharts() {
+  const chartConfigs = [
+    { id: 'driver-chart-coolant', label: 'Coolant °C', color: '#00d4ff', min: 70, max: 110, initial: 88 },
+    { id: 'driver-chart-rpm', label: 'RPM', color: '#00ff88', min: 600, max: 3000, initial: 1480 },
+    { id: 'driver-chart-voltage', label: 'Volts', color: '#ffb800', min: 11, max: 16, initial: 13.8 }
+  ];
+
+  chartConfigs.forEach(cfg => {
+    const ctx = document.getElementById(cfg.id);
+    if (!ctx) return;
+    
+    const initialData = Array(20).fill(cfg.initial).map(v => v + (Math.random() * 2 - 1));
+
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: Array(20).fill(''),
+        datasets: [{
+          data: initialData,
+          borderColor: cfg.color,
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: true,
+          backgroundColor: `${cfg.color}15`
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { display: false },
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, min: cfg.min, max: cfg.max, ticks: { color: '#5f6e8c', font: { size: 9 } } }
+        }
+      }
+    });
+
+    if (cfg.id.includes('coolant')) APP.charts.driverCoolant = chart;
+    if (cfg.id.includes('rpm')) APP.charts.driverRpm = chart;
+    if (cfg.id.includes('voltage')) APP.charts.driverVoltage = chart;
+  });
+}
+
+function renderPidTable() {
+  const tbody = document.getElementById('pid-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = APP.pidChannels.map(p => `
+    <tr>
+      <td class="font-mono text-cyan">${p.pid}</td>
+      <td><strong>${p.name}</strong></td>
+      <td class="font-mono text-muted">${p.hex}</td>
+      <td class="font-mono text-green" id="pid-val-${p.pid}">${p.val}</td>
+      <td class="font-mono text-muted">${p.unit}</td>
+      <td><span class="badge-status-green"><i class="fa-solid fa-check"></i> ${p.norm}</span></td>
+    </tr>
+  `).join('');
+}
+
+function startDriverSimulationLoop() {
+  setInterval(() => {
+    // Dynamic Micro-fluctuations
+    const rpm = 1480 + Math.floor(Math.random() * 40 - 20);
+    const temp = 88 + (Math.random() * 0.4 - 0.2);
+    const volt = 13.8 + (Math.random() * 0.1 - 0.05);
+
+    // Update charts
+    if (APP.charts.driverRpm) {
+      APP.charts.driverRpm.data.datasets[0].data.shift();
+      APP.charts.driverRpm.data.datasets[0].data.push(rpm);
+      APP.charts.driverRpm.update('none');
+    }
+    if (APP.charts.driverCoolant) {
+      APP.charts.driverCoolant.data.datasets[0].data.shift();
+      APP.charts.driverCoolant.data.datasets[0].data.push(temp);
+      APP.charts.driverCoolant.update('none');
+    }
+    if (APP.charts.driverVoltage) {
+      APP.charts.driverVoltage.data.datasets[0].data.shift();
+      APP.charts.driverVoltage.data.datasets[0].data.push(volt);
+      APP.charts.driverVoltage.update('none');
+    }
+
+    // Update Sensors Ribbon
+    const sTemp = document.getElementById('driver-sens-temp');
+    if (sTemp) sTemp.innerText = `${temp.toFixed(1)}°C`;
+    const sSpeed = document.getElementById('driver-sens-speed');
+    if (sSpeed) sSpeed.innerText = `${64 + Math.floor(Math.random() * 2)} MPH`;
+  }, 2000);
+}
+
+// Presentation Mode: Toggle Phone Frame vs Desktop
+function togglePresentationMode() {
+  APP.isPhoneFrame = !APP.isPhoneFrame;
+  const frame = document.getElementById('driver-app-frame');
+  const label = document.getElementById('pres-mode-label');
+  
+  if (APP.isPhoneFrame) {
+    frame.classList.add('phone-frame');
+    label.innerText = 'Desktop View';
+  } else {
+    frame.classList.remove('phone-frame');
+    label.innerText = 'Phone Frame';
+  }
+}
+
+// Operational Tools: Simulation Lab
+function openSimLabModal() { document.getElementById('sim-lab-modal').classList.add('open'); }
+function closeSimLabModal() { document.getElementById('sim-lab-modal').classList.remove('open'); }
+
+function injectSimAnomaly(type) {
+  closeSimLabModal();
+  playAudioChime();
+
+  if (type === 'overheat') {
+    document.getElementById('driver-sens-temp').innerText = '116.4°C';
+    document.getElementById('sub-therm-pct').innerText = '32%';
+    document.getElementById('sub-therm-bar').style.width = '32%';
+    document.getElementById('sub-therm-bar').className = 'progress-fill fill-red pulse-fill';
+    triggerCriticalToast(APP.trucks[0]);
+  } else if (type === 'bearing') {
+    inspectTruck('402');
+    triggerCriticalToast(APP.trucks[0]);
+  } else if (type === 'misfire') {
+    document.getElementById('driver-sens-misfire').innerText = '4';
+    document.getElementById('sub-power-pct').innerText = '61%';
+    document.getElementById('sub-power-bar').style.width = '61%';
+    document.getElementById('sub-power-bar').className = 'progress-fill fill-yellow';
+    triggerToastSimple("CYLINDER MISFIRE INJECTED", "P0303 Cylinder 3 Combustion Misfire detected in high-speed sampling.", "yellow");
+  } else if (type === 'voltage') {
+    document.getElementById('insp-voltage').innerText = '11.2V';
+    triggerToastSimple("VOLTAGE SAG INJECTED", "Alternator diode ripple detected. Battery voltage dropped to 11.2V.", "red");
+  } else if (type === 'tire') {
+    const tire = document.getElementById('tire-1');
+    if (tire) {
+      tire.className = 'tire-node crit';
+      tire.querySelector('.t-psi').innerText = '18';
+    }
+    triggerToastSimple("TPMS BLOWOUT HAZARD", "Steer axle tire pressure dropped to 18 PSI on I-80.", "red");
+  } else if (type === 'tamper') {
+    triggerToastSimple("ANTI-TAMPER ACTIVATED", "OBD-II port disconnected! 18650 Battery backup engaged.", "red");
+  }
+}
+
+function resetSimToNominal() {
+  closeSimLabModal();
+  document.getElementById('driver-sens-temp').innerText = '88°C';
+  document.getElementById('driver-sens-misfire').innerText = '0';
+  document.getElementById('sub-therm-pct').innerText = '78%';
+  document.getElementById('sub-therm-bar').style.width = '78%';
+  document.getElementById('sub-therm-bar').className = 'progress-fill fill-yellow';
+  document.getElementById('sub-power-pct').innerText = '95%';
+  document.getElementById('sub-power-bar').style.width = '95%';
+  document.getElementById('sub-power-bar').className = 'progress-fill fill-green';
+  triggerToastSimple("SIMULATION RESTORED", "All systems restored to baseline factory tolerances.", "green");
+}
+
+// Operational Tools: Multi-Car Garage
+function openGarageModal() { document.getElementById('garage-modal').classList.add('open'); }
+function closeGarageModal() { document.getElementById('garage-modal').classList.remove('open'); }
+
+function selectGarageVehicle(carKey) {
+  closeGarageModal();
+  playAudioChime();
+
+  const titleEl = document.getElementById('driver-active-vehicle');
+  const certVehEl = document.getElementById('cert-vehicle-name');
+
+  if (carKey === 'peterbilt') {
+    titleEl.innerText = '2024 Peterbilt 579 UltraLoft (Unit #402)';
+    if (certVehEl) certVehEl.innerText = '2024 Peterbilt 579 UltraLoft';
+    document.getElementById('driver-health-number').innerText = '87';
+    document.getElementById('driver-health-gauge').setAttribute('stroke-dasharray', '87, 100');
+  } else if (carKey === 'ford') {
+    titleEl.innerText = '2023 Ford F-150 Lightning EV';
+    if (certVehEl) certVehEl.innerText = '2023 Ford F-150 Lightning EV';
+    document.getElementById('driver-health-number').innerText = '96';
+    document.getElementById('driver-health-gauge').setAttribute('stroke-dasharray', '96, 100');
+  } else if (carKey === 'bmw') {
+    titleEl.innerText = '2022 BMW 330i xDrive Sedan';
+    if (certVehEl) certVehEl.innerText = '2022 BMW 330i xDrive Sedan';
+    document.getElementById('driver-health-number').innerText = '74';
+    document.getElementById('driver-health-gauge').setAttribute('stroke-dasharray', '74, 100');
+  }
+
+  triggerToastSimple("VEHICLE PROFILE LOADED", `Telematics switched to ${titleEl.innerText}`, "cyan");
+}
+
+// Operational Tools: Printable Health Audit Certificate
+function openReportModal() { document.getElementById('report-modal').classList.add('open'); }
+function closeReportModal() { document.getElementById('report-modal').classList.remove('open'); }
