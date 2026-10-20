@@ -872,8 +872,6 @@ function setDeviceButtons(enabled) {
 
 function renderLiveDevice() {
   const card = document.getElementById('device-card');
-  if (!card) return;
-
   const status = window.OrionLive ? window.OrionLive.status() : null;
   const data = status && status.data ? status.data : STATE.live ? STATE.live.data : null;
   const fresh = Boolean(status && status.fresh) || isLiveFresh();
@@ -964,12 +962,15 @@ function renderLiveDevice() {
     }
   }
 
-  card.dataset.state = tone;
+  if (card) {
+    card.dataset.state = tone;
+    card.setAttribute(
+      'aria-label',
+      `ESP32 device link: ${chipText}. ${data ? `Coolant ${data.coolant.toFixed(1)} degrees Celsius, battery ${data.battery.toFixed(2)} volts.` : 'No telemetry received yet.'}`
+    );
+  }
+
   setChip(tone === 'quiet' ? 'quiet' : tone, chipText);
-  card.setAttribute(
-    'aria-label',
-    `ESP32 device link: ${chipText}. ${data ? `Coolant ${data.coolant.toFixed(1)} degrees Celsius, battery ${data.battery.toFixed(2)} volts.` : 'No telemetry received yet.'}`
-  );
 }
 
 /* -----------------------------------------------------------------------------

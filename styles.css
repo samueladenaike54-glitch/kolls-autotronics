@@ -3698,8 +3698,12 @@ svg {
 
 /* Assistant tools collapse into a menu on phones and tablets */
 @media (max-width: 1023px) {
-  .topbar-demo {
+  .topbar-fleet-link {
     display: none;
+  }
+
+  .topbar-demo {
+    display: inline-grid;
   }
 
   .assistant-menu-toggle {

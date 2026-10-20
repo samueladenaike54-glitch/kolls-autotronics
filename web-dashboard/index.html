@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <link rel="stylesheet" href="styles.css?v=13.0">
+  <link rel="stylesheet" href="styles.css?v=13.1">
 </head>
 <body>
   <svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
@@ -297,47 +297,6 @@
               </div>
 
               <div class="card-foot" id="tpms-footnote"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Pressure checked 2 minutes ago</div>
-            </article>
-
-            <article class="card device-card" id="device-card" data-state="offline">
-              <div class="card-head">
-                <div>
-                  <h2>ESP32 device link</h2>
-                  <p id="device-subtitle">Waiting for the KA-TRUCK-001 gateway on HiveMQ.</p>
-                </div>
-                <span class="chip chip--quiet" id="device-state">
-                  <span class="status-dot" aria-hidden="true"></span>
-                  <span id="device-state-text">Connecting</span>
-                </span>
-              </div>
-
-              <div class="device-metrics">
-                <div class="device-metric"><span>RPM</span><strong id="device-rpm">--</strong></div>
-                <div class="device-metric"><span>Coolant</span><strong id="device-coolant">--</strong></div>
-                <div class="device-metric"><span>Oil temp</span><strong id="device-oil">--</strong></div>
-                <div class="device-metric"><span>Engine load</span><strong id="device-load">--</strong></div>
-                <div class="device-metric"><span>Vehicle battery</span><strong id="device-battery">--</strong></div>
-                <div class="device-metric"><span>Device pack</span><strong id="device-pack">--</strong></div>
-              </div>
-
-              <p class="device-trims" id="device-trims">Waiting for the next 2-second telemetry packet.</p>
-
-              <div class="device-foot">
-                <span class="device-meta" id="device-meta">HiveMQ · kolls/vehicle/telemetry</span>
-                <div class="device-actions">
-                  <button class="btn btn-secondary btn-sm" type="button" id="device-reconnect" onclick="reconnectDevice()">
-                    <i class="fa-solid fa-rotate" aria-hidden="true"></i> Reconnect
-                  </button>
-                  <button class="btn btn-secondary btn-sm" type="button" id="device-ping" onclick="pingDevice()" disabled>
-                    <i class="fa-solid fa-satellite-dish" aria-hidden="true"></i> PING
-                  </button>
-                  <button class="btn btn-secondary btn-sm" type="button" id="device-reset" onclick="resetDeviceTamper()" disabled>
-                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Reset tamper
-                  </button>
-                </div>
-              </div>
-
-              <p class="device-note">Engine, cooling and electrical readings come from the ESP32. TPMS, brake wear and fuel range are garage estimates because those sensors are not on the current CAN feed.</p>
             </article>
 
           </div>
@@ -922,6 +881,6 @@
   <script src="mqtt.min.js?v=5.10.4"></script>
   <script src="live-telemetry.js?v=1.1"></script>
   <script src="ai-engine.js?v=1.1"></script>
-  <script src="app.js?v=12.1"></script>
+  <script src="app.js?v=12.2"></script>
 </body>
 </html>
