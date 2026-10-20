@@ -1,4 +1,4 @@
-# Kolls Autotronics — AI Vehicle Health Monitoring System Architecture
+# Orion by Kolls — AI Vehicle Health Monitoring System Architecture
 
 > **Document Type:** Technical & System Architecture Specification  
 > **Target Audience:** Engineering Team, Automotive Partners, Hardware Prototyping Engineers & Strategic Investors  
@@ -10,11 +10,11 @@
 ## 1. System Overview
 
 ### 1.1 Executive Summary
-**Kolls Autotronics** is an edge-computing vehicle health monitoring and prognostic telematics system engineered specifically for commercial vehicle fleets, logistics trucks, and public transport operators in emerging markets such as Nigeria and Sub-Saharan Africa.
+**Orion by Kolls** is an edge-computing vehicle health monitoring and prognostic telematics system engineered specifically for commercial vehicle fleets, logistics trucks, and public transport operators in emerging markets such as Nigeria and Sub-Saharan Africa.
 
 Commercial transport operators lose millions of Naira annually to undetected cooling failures, counterfeit fuel degradation, transmission thermal runaway, and unauthorized hardware tampering by drivers attempting to evade tracking. Traditional OBD-II trackers act merely as "dumb pipes", streaming raw coordinates or waiting for the vehicle’s Electronic Control Unit (ECU) to illuminate the Malfunction Indicator Lamp (Check Engine Light). By the time an OEM dashboard light illuminates, irreversible mechanical damage (e.g., blown head gaskets, cylinder scoring, warped engine blocks) has often already occurred.
 
-Kolls Autotronics shifts intelligence directly to the vehicular edge:
+Orion shifts intelligence directly to the vehicular edge:
 1. **High-Frequency In-Situ Sampling:** Interrogates the vehicle's High-Speed CAN Bus (ISO 15765-4 / SAE J1939) at 10–50 Hz for mission-critical engine parameters.
 2. **On-Device Edge AI & Heuristics:** Executes localized statistical anomaly detection, derivative thermal trend modeling ($dT/dt$), and fuel-trim divergence algorithms on an ESP32 dual-core microcontroller without requiring constant cloud connectivity.
 3. **Anti-Tamper Failover Architecture:** Features an internal 18650 Li-ion battery backup and instantaneous voltage-drop detection circuit that transmits emergency distress telemetry even when the unit is forcibly ripped from the OBD-II port.
@@ -149,7 +149,7 @@ The prototype BOM was strictly curated to balance industrial-grade automotive re
 | | **TOTAL ESTIMATED PROTOTYPE BOM** | | | **~₦29,900** | *(Base target: ~₦25,900+)* |
 
 > [!TIP]
-> **Production Scaling Economics:** In commercial production batches of 1,000+ units, custom four-layer integrated PCBA manufacturing reduces the BOM to under **$12.50 USD (~₦19,000 NGN)** per unit.
+> **Production Scaling Economics:** In commercial production batches of 1,000+ units, custom four-layer integrated PCBA manufacturing reduces the BOM to under **₦19,000 NGN** per unit.
 
 ---
 
@@ -312,7 +312,7 @@ The edge engine does not merely check if a sensor exceeded an arbitrary static t
 | **EGT** | **Exhaust Gas Temperature**<br>Standard: Monitors catalytic converter and DPF thermal conditions. | Temperature gradient slope tracking during sustained highway hauling and uphill grade climbs. | **DPF Thermal Runaway & Turbo Melting:** Prevents extreme over-fueling conditions that melt turbo turbine wheels and crack exhaust manifolds. |
 | **DPF Press** | **DPF Differential Pressure**<br>Standard: Measures pressure drop across diesel particulate filter substrate. | Normalizes $\Delta P_{DPF}$ against exhaust volumetric flow rate ($V_{ex} \propto RPM \times MAP$). | **Soot Over-Accumulation:** Alerts dispatch to schedule highway regeneration before catastrophic filter face-plugging requires complete DPF replacement. |
 | **VSS** | **Vehicle Speed Sensor**<br>Standard: Transmits road speed from transmission output shaft. | Cross-correlates VSS road speed with engine RPM and engaged transmission gear ratio. | **Clutch / Torque Converter Slip:** Detects worn commercial clutch plates or slipping automatic transmission torque converter clutches. |
-| **TFT** | **Transmission Fluid Temp**<br>Standard: Monitors transmission oil cooling. | Integrates thermal load index over time spent in stop-and-go heavy traffic. | **Transmission Fluid Oxidation:** Alerts fleet operations to flush fluid after severe thermal overload, saving $3,000+ USD gearbox rebuilds. |
+| **TFT** | **Transmission Fluid Temp**<br>Standard: Monitors transmission oil cooling. | Integrates thermal load index over time spent in stop-and-go heavy traffic. | **Transmission Fluid Oxidation:** Alerts fleet operations to flush fluid after severe thermal overload, saving ₦4,500,000+ on gearbox rebuilds. |
 
 ---
 

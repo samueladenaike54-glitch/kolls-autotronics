@@ -2,579 +2,926 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Kolls — Smart Car Health Monitor</title>
-  
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚗</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Orion by Kolls — live vehicle diagnostics, maintenance planning and plain-English mechanic advice.">
+  <meta name="theme-color" content="#f4f4f1">
+  <title>Orion — Vehicle Health</title>
 
-  <!-- Google Fonts: Inter -->
+  <link rel="icon" type="image/svg+xml" href="logo.svg?v=3">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-
-  <!-- Font Awesome 6 Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <link rel="stylesheet" href="styles.css?v=4.0">
+  <link rel="stylesheet" href="styles.css?v=13.0">
 </head>
 <body>
+  <svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <symbol id="orion-mark" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 24 13.2 18.1 18 14.2 21.8 10.4"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="8" cy="24" r="1.9"/>
+        <circle cx="13.2" cy="18.1" r="1.9"/>
+        <circle cx="18" cy="14.2" r="1.9"/>
+      </g>
+      <path d="M23.4 4.8 24.5 7.9 27.6 9 24.5 10.1 23.4 13.2 22.3 10.1 19.2 9 22.3 7.9Z" fill="var(--accent-bright)"/>
+      <circle cx="8.6" cy="8.4" r="1" fill="currentColor" opacity=".5"/>
+      <circle cx="26" cy="24.2" r="1" fill="currentColor" opacity=".5"/>
+    </symbol>
+  </svg>
+  <a class="skip-link" href="#main-content">Skip to content</a>
 
-  <!-- ========================================================================= -->
-  <!-- MOBILE APPLICATION SHELL                                                  -->
-  <!-- ========================================================================= -->
-  <div class="app-container">
+  <div class="app-shell">
 
-    <!-- Top Friendly Header -->
-    <header class="app-header">
-      <div class="header-brand">
-        <div class="brand-logo"><i class="fa-solid fa-car-side"></i></div>
-        <div>
-          <h1>KOLLS</h1>
-          <p id="header-car-name">2024 Family SUV • Connected</p>
-        </div>
-      </div>
-      <div class="header-actions">
-        <button class="btn-header-action" onclick="openGarageModal()" title="Switch Vehicle">
-          <i class="fa-solid fa-warehouse"></i>
-          <span>Garage</span>
+    <!-- Desktop navigation -->
+    <aside class="sidebar" aria-label="Workspace">
+      <a class="brand" href="#" onclick="switchTab('health'); return false;" aria-label="Orion home">
+        <span class="brand-mark"><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#orion-mark"></use></svg></span>
+        <span class="brand-text"><strong>ORION</strong><small>by Kolls</small></span>
+      </a>
+
+      <nav class="side-nav" aria-label="Main">
+        <p class="nav-label">Workspace</p>
+        <button class="nav-btn active" type="button" data-tab="health" aria-current="page">
+          <i class="fa-solid fa-heart-pulse" aria-hidden="true"></i>
+          <span>Health</span>
         </button>
-        <button class="btn-header-action" onclick="openSimModal()" title="Demo Test Lab">
-          <i class="fa-solid fa-flask"></i>
-          <span>Demo</span>
+        <button class="nav-btn" type="button" data-tab="trends">
+          <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+          <span>Trends</span>
         </button>
+        <button class="nav-btn" type="button" data-tab="repairs">
+          <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>
+          <span>Maintenance</span>
+        </button>
+        <button class="nav-btn" type="button" data-tab="assistant">
+          <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
+          <span>Assistant</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a class="sidebar-demo sidebar-link" href="fleet.html">
+          <span class="sidebar-demo-icon"><i class="fa-solid fa-building-columns" aria-hidden="true"></i></span>
+          <span class="sidebar-demo-copy">
+            <strong>Fleet portal</strong>
+            <small>Manage every vehicle</small>
+          </span>
+          <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+        </a>
+        <button class="sidebar-demo sidebar-demo--secondary" type="button" onclick="openSimModal()">
+          <span class="sidebar-demo-icon"><i class="fa-solid fa-flask" aria-hidden="true"></i></span>
+          <span class="sidebar-demo-copy">
+            <strong>Demo lab</strong>
+            <small>Simulate a vehicle fault</small>
+          </span>
+          <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+        </button>
+        <p class="version">Orion OS · v4.1</p>
       </div>
-    </header>
+    </aside>
 
-    <!-- Main Scrollable Screen Area -->
-    <main class="app-body">
+    <!-- Main application -->
+    <div class="app-main">
 
-      <!-- ===================================================================== -->
-      <!-- TAB 1: CAR HEALTH (Friendly, Visual, Easy to Understand)              -->
-      <!-- ===================================================================== -->
-      <section class="tab-page active" id="page-health">
-        
-        <!-- Big Friendly Health Score Card -->
-        <div class="card health-summary-card">
-          <div class="score-circle-box">
-            <svg class="score-circle-svg" viewBox="0 0 36 36">
-              <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <path class="circle-fill" id="health-circle-bar" stroke-dasharray="87, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <text x="18" y="21" class="circle-score-text" id="health-score-number">87</text>
-            </svg>
-            <span class="score-scale-text">/ 100</span>
-          </div>
-
-          <div class="score-info-box">
-            <div class="status-pill status-good" id="health-status-badge">
-              <i class="fa-solid fa-circle-check"></i> Great Condition
-            </div>
-            <h2>Your car is running smoothly</h2>
-            <p id="health-summary-text">No urgent breakdowns detected. One minor service recommended soon to prevent future costs.</p>
-          </div>
+      <header class="topbar">
+        <div class="topbar-brand">
+          <span class="brand-mark brand-mark--sm"><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#orion-mark"></use></svg></span>
+          <strong>ORION</strong>
         </div>
 
-        <!-- Quick Vital Glance Row -->
-        <div class="vitals-grid">
-          <div class="vital-item">
-            <span class="vital-label"><i class="fa-solid fa-battery-full text-green"></i> Battery</span>
-            <strong class="vital-value" id="val-battery">13.8 V</strong>
-            <span class="vital-sub text-green">Healthy</span>
-          </div>
-          <div class="vital-item">
-            <span class="vital-label"><i class="fa-solid fa-temperature-half text-yellow"></i> Engine Temp</span>
-            <strong class="vital-value" id="val-temp">88°C</strong>
-            <span class="vital-sub text-green">Normal</span>
-          </div>
-          <div class="vital-item">
-            <span class="vital-label"><i class="fa-solid fa-gas-pump text-cyan"></i> Fuel Range</span>
-            <strong class="vital-value" id="val-range">680 KM</strong>
-            <span class="vital-sub">75% Tank</span>
-          </div>
+        <div class="topbar-context">
+          <span class="status-dot status-dot--dark" id="connection-dot"></span>
+          <span id="connection-text">Vehicle connected</span>
         </div>
 
-        <!-- Main Components Health Checklist -->
-        <div class="card">
-          <div class="card-title-row">
-            <h3><i class="fa-solid fa-list-check text-cyan"></i> Vehicle Systems Check</h3>
-            <span class="badge-subtle">Live scan</span>
-          </div>
-
-          <div class="component-list">
-            <!-- Engine -->
-            <div class="component-row">
-              <div class="comp-icon bg-green-light text-green"><i class="fa-solid fa-gears"></i></div>
-              <div class="comp-info">
-                <strong>Engine & Transmission</strong>
-                <p>Combustion is clean, no misfires detected</p>
-              </div>
-              <div class="comp-status text-green">
-                <strong>95%</strong>
-                <span>Good</span>
-              </div>
-            </div>
-
-            <!-- Cooling -->
-            <div class="component-row alert-row" id="comp-row-cooling">
-              <div class="comp-icon bg-yellow-light text-yellow"><i class="fa-solid fa-snowflake"></i></div>
-              <div class="comp-info">
-                <strong>Cooling & Thermostat</strong>
-                <p class="text-yellow">Thermostat responding slowly (Attention)</p>
-              </div>
-              <div class="comp-status text-yellow">
-                <strong>78%</strong>
-                <span>Inspect</span>
-              </div>
-            </div>
-
-            <!-- Electrical -->
-            <div class="component-row">
-              <div class="comp-icon bg-green-light text-green"><i class="fa-solid fa-bolt"></i></div>
-              <div class="comp-info">
-                <strong>Battery & Alternator</strong>
-                <p>Alternator charging at normal output</p>
-              </div>
-              <div class="comp-status text-green">
-                <strong>92%</strong>
-                <span>Good</span>
-              </div>
-            </div>
-
-            <!-- Brakes -->
-            <div class="component-row">
-              <div class="comp-icon bg-green-light text-green"><i class="fa-solid fa-circle-stop"></i></div>
-              <div class="comp-info">
-                <strong>Brakes & Fluid</strong>
-                <p>Plenty of pad lining remaining</p>
-              </div>
-              <div class="comp-status text-green">
-                <strong>84%</strong>
-                <span>Good</span>
-              </div>
-            </div>
-          </div>
+        <div class="topbar-right">
+          <button class="vehicle-chip" type="button" onclick="openGarageModal()" aria-haspopup="dialog" title="Switch vehicle">
+            <span class="status-dot" id="vehicle-dot"></span>
+            <span id="header-car-name">RAV4 Hybrid</span>
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+          </button>
+          <a class="icon-btn topbar-fleet-link" href="fleet.html" aria-label="Open fleet portal" title="Fleet portal">
+            <i class="fa-solid fa-building-columns" aria-hidden="true"></i>
+          </a>
+          <button class="icon-btn topbar-demo" type="button" onclick="openSimModal()" aria-haspopup="dialog" aria-label="Open demo lab" title="Demo lab">
+            <i class="fa-solid fa-flask" aria-hidden="true"></i>
+          </button>
         </div>
+      </header>
 
-        <!-- Tire Pressures (Clean & Visual) -->
-        <div class="card">
-          <div class="card-title-row">
-            <h3><i class="fa-solid fa-circle-dot text-cyan"></i> Tire Pressures (TPMS)</h3>
-            <span class="badge-subtle text-green">All Tires Normal</span>
-          </div>
-          
-          <div class="tires-visual-grid">
-            <div class="tire-card">
-              <span class="tire-pos">Front Left</span>
-              <strong class="tire-psi text-green" id="tire-fl">35 PSI</strong>
-              <small class="tire-note">Optimal</small>
-            </div>
-            <div class="tire-card">
-              <span class="tire-pos">Front Right</span>
-              <strong class="tire-psi text-green" id="tire-fr">35 PSI</strong>
-              <small class="tire-note">Optimal</small>
-            </div>
-            <div class="tire-card">
-              <span class="tire-pos">Rear Left</span>
-              <strong class="tire-psi text-green" id="tire-rl">34 PSI</strong>
-              <small class="tire-note">Optimal</small>
-            </div>
-            <div class="tire-card">
-              <span class="tire-pos">Rear Right</span>
-              <strong class="tire-psi text-green" id="tire-rr">34 PSI</strong>
-              <small class="tire-note">Optimal</small>
-            </div>
-          </div>
-        </div>
+      <main class="content" id="main-content" tabindex="-1">
 
-      </section>
-
-
-      <!-- ===================================================================== -->
-      <!-- TAB 2: REPAIRS & WEAR (Save Money, Avoid Breakdowns, Wear Horizon)     -->
-      <!-- ===================================================================== -->
-      <section class="tab-page" id="page-repairs">
-        
-        <!-- Big Money Saving Hero Card -->
-        <div class="card money-hero-card">
-          <div class="money-badge">Smart Repair Savings</div>
-          <h2>Fix Early, Save Big</h2>
-          <p>Catching small wear before it damages other parts can save you thousands of dollars.</p>
-          <div class="money-stat-row">
+        <!-- =================================================================== -->
+        <!-- HEALTH                                                              -->
+        <!-- =================================================================== -->
+        <section class="page active" id="page-health" aria-labelledby="health-title">
+          <header class="page-head">
             <div>
-              <span>Estimated Saved</span>
-              <strong class="text-green" id="total-saved-display">$2,300+</strong>
+              <p class="eyebrow">Vehicle overview</p>
+              <h1 id="health-title">Health</h1>
+              <p class="page-sub">
+                <span id="page-car-name">2024 Toyota RAV4 Hybrid</span>
+                <span class="dot-sep" aria-hidden="true">·</span>
+                <span id="last-scan">Updated just now</span>
+              </p>
             </div>
-            <div class="hero-bolt-icon">
-              <i class="fa-solid fa-piggy-bank text-green"></i>
-            </div>
-          </div>
-        </div>
-
-        <!-- Upcoming Smart Alerts (Actionable Cards) -->
-        <div class="section-heading">
-          <h3>Items Needing Attention</h3>
-          <span>Tap "Simulate Fix" to resolve</span>
-        </div>
-
-        <div class="alerts-stream-container" id="alerts-stream">
-          <!-- Item 1: Thermostat -->
-          <div class="repair-card" id="repair-alert-1">
-            <div class="repair-header">
-              <div class="repair-icon bg-yellow-light text-yellow"><i class="fa-solid fa-temperature-arrow-up"></i></div>
-              <div class="repair-title-box">
-                <h4>Engine Thermostat Valve Sluggish</h4>
-                <p>The valve opens slightly late, making your engine run a bit warm.</p>
-              </div>
-            </div>
-
-            <div class="cost-compare-box">
-              <div class="cost-item">
-                <span class="cost-lbl">Fix Early (Today):</span>
-                <strong class="cost-val text-green">$20</strong>
-                <small>Thermostat swap</small>
-              </div>
-              <div class="cost-divider">vs</div>
-              <div class="cost-item">
-                <span class="cost-lbl">If Ignored:</span>
-                <strong class="cost-val text-red">$1,850</strong>
-                <small>Warped engine head</small>
-              </div>
-            </div>
-
-            <div class="repair-action-row">
-              <span class="savings-text"><i class="fa-solid fa-check"></i> Saves you $1,830</span>
-              <button class="btn-fix" onclick="simulateRepair(1, 1830)">
-                <i class="fa-solid fa-wrench"></i> Simulate Fix
+            <div class="page-head-actions">
+              <button class="btn btn-secondary" type="button" id="scan-btn" onclick="runScan()" aria-label="Run a new vehicle scan">
+                <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                <span>Scan</span>
               </button>
             </div>
-          </div>
+          </header>
 
-          <!-- Item 2: Brake Pads -->
-          <div class="repair-card" id="repair-alert-2">
-            <div class="repair-header">
-              <div class="repair-icon bg-yellow-light text-yellow"><i class="fa-solid fa-circle-notch"></i></div>
-              <div class="repair-title-box">
-                <h4>Front Brake Pads Getting Low</h4>
-                <p>Pad thickness is at 2.7 mm. Recommended replacement in ~1,200 km.</p>
+          <div class="health-layout">
+
+            <article class="score-card">
+              <div class="score-top">
+                <span class="eyebrow eyebrow--light">Overall health</span>
+                <span class="live-badge is-demo" id="live-badge"><span class="live-dot" aria-hidden="true"></span><span id="live-badge-text">Demo mode</span></span>
               </div>
+
+              <div class="score-main">
+                <div class="score-copy">
+                  <div class="status-pill" id="health-status-badge">
+                    <span class="status-dot" aria-hidden="true"></span>
+                    <span id="health-status-text">Good condition</span>
+                  </div>
+                  <h2 id="health-headline">Your car is healthy.</h2>
+                  <p id="health-summary-text">No urgent faults. The cooling system is due for a check soon.</p>
+                </div>
+
+                <div class="score-ring" id="score-ring" role="img" aria-label="Health score: 87 out of 100">
+                  <svg viewBox="0 0 120 120" aria-hidden="true">
+                    <circle class="ring-track" cx="60" cy="60" r="52" pathLength="100"></circle>
+                    <circle class="ring-value" id="ring-value" cx="60" cy="60" r="52" pathLength="100"></circle>
+                  </svg>
+                  <div class="score-ring-inner">
+                    <strong id="health-score-number">87</strong>
+                    <span>/ 100</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="score-foot">
+                <span><i class="fa-solid fa-circle-check" aria-hidden="true"></i> 4 systems monitored</span>
+                <button class="link-btn" type="button" onclick="switchTab('repairs')">
+                  View maintenance <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </button>
+              </div>
+            </article>
+
+            <div class="vitals-column">
+              <article class="vital-card">
+                <div class="vital-icon"><i class="fa-solid fa-battery-three-quarters" aria-hidden="true"></i></div>
+                <div class="vital-copy">
+                  <span class="vital-label">Battery</span>
+                  <strong class="vital-value" id="val-battery">13.8 V</strong>
+                  <span class="vital-meta"><span class="status-dot" id="battery-dot" aria-hidden="true"></span><span id="battery-status-text">Healthy</span></span>
+                </div>
+              </article>
+
+              <article class="vital-card">
+                <div class="vital-icon"><i class="fa-solid fa-temperature-half" aria-hidden="true"></i></div>
+                <div class="vital-copy">
+                  <span class="vital-label">Engine temp</span>
+                  <strong class="vital-value" id="val-temp">88°C</strong>
+                  <span class="vital-meta"><span class="status-dot" id="temp-dot" aria-hidden="true"></span><span id="temp-status-text">Normal</span></span>
+                </div>
+              </article>
+
+              <article class="vital-card">
+                <div class="vital-icon"><i class="fa-solid fa-gas-pump" aria-hidden="true"></i></div>
+                <div class="vital-copy">
+                  <span class="vital-label">Fuel range</span>
+                  <strong class="vital-value" id="val-range">680 km</strong>
+                  <span class="vital-meta"><span class="status-dot status-dot--neutral" id="range-dot" aria-hidden="true"></span><span id="range-status-text">75% tank</span></span>
+                </div>
+              </article>
             </div>
 
-            <div class="cost-compare-box">
-              <div class="cost-item">
-                <span class="cost-lbl">Fix Early (Today):</span>
-                <strong class="cost-val text-green">$180</strong>
-                <small>Brake pads only</small>
+            <article class="card systems-card">
+              <div class="card-head">
+                <div>
+                  <h2>Systems</h2>
+                  <p id="systems-sub">Live diagnostics from your vehicle</p>
+                </div>
+                <span class="chip chip--quiet">4 monitored</span>
               </div>
-              <div class="cost-divider">vs</div>
-              <div class="cost-item">
-                <span class="cost-lbl">If Ignored:</span>
-                <strong class="cost-val text-red">$650</strong>
-                <small>Gouged metal rotors</small>
+
+              <div class="system-list">
+                <div class="system-row">
+                  <div class="system-icon"><i class="fa-solid fa-gears" aria-hidden="true"></i></div>
+                  <div class="system-copy">
+                    <strong>Engine &amp; transmission</strong>
+                    <span>No misfires or stored fault codes</span>
+                  </div>
+                  <div class="system-metric">
+                    <span class="system-value" data-system-value="engine">95%</span>
+                    <span class="status status--good"><span class="status-dot" aria-hidden="true"></span>Good</span>
+                  </div>
+                </div>
+
+                <div class="system-row" id="comp-row-cooling">
+                  <div class="system-icon" id="cooling-icon"><i class="fa-solid fa-snowflake" aria-hidden="true"></i></div>
+                  <div class="system-copy">
+                    <strong>Cooling &amp; thermostat</strong>
+                    <span id="cooling-desc">Thermostat responding slowly</span>
+                  </div>
+                  <div class="system-metric">
+                    <span class="system-value" id="cooling-value">78%</span>
+                    <span class="status status--warn" id="cooling-status"><span class="status-dot" aria-hidden="true"></span><span id="cooling-status-text">Watch</span></span>
+                  </div>
+                </div>
+
+                <div class="system-row">
+                  <div class="system-icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></div>
+                  <div class="system-copy">
+                    <strong>Battery &amp; alternator</strong>
+                    <span>Charging at normal output</span>
+                  </div>
+                  <div class="system-metric">
+                    <span class="system-value" data-system-value="electrical">92%</span>
+                    <span class="status status--good"><span class="status-dot" aria-hidden="true"></span>Good</span>
+                  </div>
+                </div>
+
+                <div class="system-row">
+                  <div class="system-icon"><i class="fa-solid fa-circle-stop" aria-hidden="true"></i></div>
+                  <div class="system-copy">
+                    <strong>Brakes &amp; fluid</strong>
+                    <span>Pad lining within service range</span>
+                  </div>
+                  <div class="system-metric">
+                    <span class="system-value" data-system-value="brakes">84%</span>
+                    <span class="status status--good"><span class="status-dot" aria-hidden="true"></span>Good</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            </article>
 
-            <div class="repair-action-row">
-              <span class="savings-text"><i class="fa-solid fa-check"></i> Saves you $470</span>
-              <button class="btn-fix" onclick="simulateRepair(2, 470)">
-                <i class="fa-solid fa-wrench"></i> Simulate Fix
-              </button>
-            </div>
+            <article class="card tires-card">
+              <div class="card-head">
+                <div>
+                  <h2>Tire pressure</h2>
+                  <p>Recommended 32–36 PSI</p>
+                </div>
+                <span class="chip chip--good" id="tpms-badge"><span class="status-dot" aria-hidden="true"></span><span id="tpms-badge-text">All normal</span></span>
+              </div>
+
+              <div class="tire-grid">
+                <div class="tire-item" id="tire-fl-item">
+                  <span class="tire-pos">Front left</span>
+                  <div class="tire-reading"><strong id="tire-fl">35</strong><span>PSI</span></div>
+                  <span class="tire-state"><span class="status-dot" id="tire-fl-dot" aria-hidden="true"></span><span id="tire-fl-state">Optimal</span></span>
+                </div>
+                <div class="tire-item" id="tire-fr-item">
+                  <span class="tire-pos">Front right</span>
+                  <div class="tire-reading"><strong id="tire-fr">35</strong><span>PSI</span></div>
+                  <span class="tire-state"><span class="status-dot" id="tire-fr-dot" aria-hidden="true"></span><span id="tire-fr-state">Optimal</span></span>
+                </div>
+                <div class="tire-item" id="tire-rl-item">
+                  <span class="tire-pos">Rear left</span>
+                  <div class="tire-reading"><strong id="tire-rl">34</strong><span>PSI</span></div>
+                  <span class="tire-state"><span class="status-dot" id="tire-rl-dot" aria-hidden="true"></span><span id="tire-rl-state">Optimal</span></span>
+                </div>
+                <div class="tire-item" id="tire-rr-item">
+                  <span class="tire-pos">Rear right</span>
+                  <div class="tire-reading"><strong id="tire-rr">34</strong><span>PSI</span></div>
+                  <span class="tire-state"><span class="status-dot" id="tire-rr-dot" aria-hidden="true"></span><span id="tire-rr-state">Optimal</span></span>
+                </div>
+              </div>
+
+              <div class="card-foot" id="tpms-footnote"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Pressure checked 2 minutes ago</div>
+            </article>
+
+            <article class="card device-card" id="device-card" data-state="offline">
+              <div class="card-head">
+                <div>
+                  <h2>ESP32 device link</h2>
+                  <p id="device-subtitle">Waiting for the KA-TRUCK-001 gateway on HiveMQ.</p>
+                </div>
+                <span class="chip chip--quiet" id="device-state">
+                  <span class="status-dot" aria-hidden="true"></span>
+                  <span id="device-state-text">Connecting</span>
+                </span>
+              </div>
+
+              <div class="device-metrics">
+                <div class="device-metric"><span>RPM</span><strong id="device-rpm">--</strong></div>
+                <div class="device-metric"><span>Coolant</span><strong id="device-coolant">--</strong></div>
+                <div class="device-metric"><span>Oil temp</span><strong id="device-oil">--</strong></div>
+                <div class="device-metric"><span>Engine load</span><strong id="device-load">--</strong></div>
+                <div class="device-metric"><span>Vehicle battery</span><strong id="device-battery">--</strong></div>
+                <div class="device-metric"><span>Device pack</span><strong id="device-pack">--</strong></div>
+              </div>
+
+              <p class="device-trims" id="device-trims">Waiting for the next 2-second telemetry packet.</p>
+
+              <div class="device-foot">
+                <span class="device-meta" id="device-meta">HiveMQ · kolls/vehicle/telemetry</span>
+                <div class="device-actions">
+                  <button class="btn btn-secondary btn-sm" type="button" id="device-reconnect" onclick="reconnectDevice()">
+                    <i class="fa-solid fa-rotate" aria-hidden="true"></i> Reconnect
+                  </button>
+                  <button class="btn btn-secondary btn-sm" type="button" id="device-ping" onclick="pingDevice()" disabled>
+                    <i class="fa-solid fa-satellite-dish" aria-hidden="true"></i> PING
+                  </button>
+                  <button class="btn btn-secondary btn-sm" type="button" id="device-reset" onclick="resetDeviceTamper()" disabled>
+                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Reset tamper
+                  </button>
+                </div>
+              </div>
+
+              <p class="device-note">Engine, cooling and electrical readings come from the ESP32. TPMS, brake wear and fuel range are garage estimates because those sensors are not on the current CAN feed.</p>
+            </article>
+
           </div>
-        </div>
+        </section>
 
-        <!-- Driving Style Wear Simulator -->
-        <div class="card">
-          <div class="card-title-row">
-            <h3><i class="fa-solid fa-gauge-simple-high text-cyan"></i> Part Life Wear Simulator</h3>
-          </div>
-          <p class="card-subtext">Choose your typical driving style to see how long your parts will last:</p>
-
-          <div class="driving-style-picker">
-            <button class="style-choice-btn active" id="btn-style-gentle" onclick="setDriverStyle('gentle')">
-              <i class="fa-solid fa-leaf text-green"></i>
-              <strong>Gentle / Highway</strong>
-              <span>Longest life</span>
-            </button>
-            <button class="style-choice-btn" id="btn-style-city" onclick="setDriverStyle('city')">
-              <i class="fa-solid fa-city text-cyan"></i>
-              <strong>Normal City</strong>
-              <span>Average wear</span>
-            </button>
-            <button class="style-choice-btn" id="btn-style-heavy" onclick="setDriverStyle('heavy')">
-              <i class="fa-solid fa-stopwatch text-yellow"></i>
-              <strong>Stop & Go Heavy</strong>
-              <span>Faster wear</span>
-            </button>
-          </div>
-
-          <div class="wear-items-grid" id="wear-bars-container">
-            <!-- Dynamically populated -->
-          </div>
-        </div>
-
-      </section>
-
-
-      <!-- ===================================================================== -->
-      <!-- TAB 3: ASSISTANT & TOOLS (Advice, Chat Sub-feature, Certificate)       -->
-      <!-- ===================================================================== -->
-      <section class="tab-page" id="page-assistant">
-        
-        <!-- Plain-English AI Mechanic (Sub-feature here without a dedicated toolbar) -->
-        <div class="card mechanic-assistant-card">
-          <div class="assistant-head">
-            <div class="assistant-avatar"><i class="fa-solid fa-user-gear"></i></div>
+        <!-- =================================================================== -->
+        <!-- TRENDS                                                              -->
+        <!-- =================================================================== -->
+        <section class="page" id="page-trends" aria-labelledby="trends-title">
+          <header class="page-head">
             <div>
-              <h3>AI Mechanic Assistant</h3>
-              <p>Simple answers about your car in everyday words</p>
+              <p class="eyebrow">Vehicle history</p>
+              <h1 id="trends-title">Trends</h1>
+              <p class="page-sub">Health, efficiency and battery history at a glance.</p>
             </div>
-          </div>
+          </header>
 
-          <!-- Chat Conversation Scroll Area -->
-          <div class="assistant-chat-box" id="assistant-chat-stream">
-            <div class="msg-bubble msg-bot">
-              <p>Hello! I'm your digital car mechanic. Ask me any question about your car and I'll explain it in plain English with simple analogies.</p>
-            </div>
-            <div class="msg-bubble msg-bot">
-              <p>💡 <strong>Thermostat Tip:</strong> Think of the engine thermostat like a door that lets heat out. Right now it's opening slowly. A quick $20 fix today avoids an overheated engine later.</p>
-            </div>
-          </div>
-
-          <!-- Quick Question Suggestions -->
-          <div class="quick-questions-scroll">
-            <button onclick="askMechanicQuestion('Why does the car feel like it runs warm?')">Why is car warm?</button>
-            <button onclick="askMechanicQuestion('How long can I drive on my current brake pads?')">Brake pad life?</button>
-            <button onclick="askMechanicQuestion('How is my battery charging?')">Battery health?</button>
-            <button onclick="askMechanicQuestion('What is the best way to save fuel?')">How to save fuel?</button>
-          </div>
-
-          <!-- Clean Single Input Box -->
-          <div class="chat-input-bar">
-            <input type="text" id="assistant-input-field" placeholder="Ask a question about your car..." onkeypress="if(event.key==='Enter') sendAssistantMessage()">
-            <button class="btn-send-msg" onclick="sendAssistantMessage()">
-              <i class="fa-solid fa-arrow-up"></i>
-            </button>
-          </div>
-        </div>
-
-        <!-- Driving Habits & Money Saved -->
-        <div class="card habits-card">
-          <div class="card-title-row">
-            <h3><i class="fa-solid fa-award text-green"></i> Good Driving Habits</h3>
-            <span class="badge-green">+$2,960 / Year Saved</span>
-          </div>
-          <p class="card-subtext">You're saving money on gas and parts by driving smoothly.</p>
-
-          <div class="habits-grid">
-            <div class="habit-tile">
-              <span>Smooth Braking</span>
-              <strong class="text-green">92%</strong>
-              <small>Saves pads</small>
-            </div>
-            <div class="habit-tile">
-              <span>Gentle Starts</span>
-              <strong class="text-green">88%</strong>
-              <small>Saves fuel</small>
-            </div>
-            <div class="habit-tile">
-              <span>Low Idling</span>
-              <strong class="text-green">95%</strong>
-              <small>Clean engine</small>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tools & Certificate Shortcuts -->
-        <div class="card">
-          <div class="card-title-row">
-            <h3><i class="fa-solid fa-toolbox text-cyan"></i> Vehicle Tools</h3>
-          </div>
-
-          <div class="tools-buttons-stack">
-            <button class="tool-btn" onclick="openCertModal()">
-              <div class="tb-left">
-                <i class="fa-solid fa-certificate text-green"></i>
+          <div class="trends-layout">
+            <article class="card chart-card chart-card--health">
+              <div class="card-head chart-head">
                 <div>
-                  <strong>Official Health Audit Certificate</strong>
-                  <span>Print or save a verified health report for car resale or service</span>
+                  <div class="chart-title-row">
+                    <h2>Health score</h2>
+                    <span class="chip chip--quiet">Sample data</span>
+                  </div>
+                  <p id="health-trend-caption">Daily overall condition, last 30 days.</p>
+                </div>
+                <div class="segmented chart-range" role="group" aria-label="Health score date range">
+                  <button class="seg-btn" type="button" data-trend-range="7" aria-pressed="false">7D</button>
+                  <button class="seg-btn active" type="button" data-trend-range="30" aria-pressed="true">30D</button>
+                  <button class="seg-btn" type="button" data-trend-range="90" aria-pressed="false">90D</button>
                 </div>
               </div>
-              <i class="fa-solid fa-chevron-right text-muted"></i>
-            </button>
 
-            <button class="tool-btn" onclick="openGarageModal()">
-              <div class="tb-left">
-                <i class="fa-solid fa-car text-cyan"></i>
+              <div class="chart-kpis">
+                <div class="chart-kpi-main">
+                  <strong id="trend-current-score">87</strong><span>/ 100 today</span>
+                </div>
+                <span class="chart-delta" id="trend-delta">
+                  <i class="fa-solid fa-arrow-trend-up" aria-hidden="true"></i>
+                  <span>+4 pts</span>
+                </span>
+              </div>
+
+              <div class="line-chart" id="health-chart" role="img" aria-label="Health score over the last 30 days">
+                <div class="chart-y" id="health-chart-y" aria-hidden="true"></div>
+                <div class="chart-plot">
+                  <svg class="chart-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="health-area-fill" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#0b7a53" stop-opacity="0.18"></stop>
+                        <stop offset="100%" stop-color="#0b7a53" stop-opacity="0.01"></stop>
+                      </linearGradient>
+                    </defs>
+                    <g class="chart-grid" id="health-chart-grid"></g>
+                    <path class="chart-area" id="health-chart-area" fill="url(#health-area-fill)" d=""></path>
+                    <path class="chart-line" id="health-chart-line" d=""></path>
+                  </svg>
+                  <span class="chart-last-dot" id="health-chart-dot" aria-hidden="true"></span>
+                </div>
+                <div class="chart-x" id="health-chart-x" aria-hidden="true"></div>
+              </div>
+
+              <div class="chart-foot">
+                <span><strong id="trend-best">87</strong> best day</span>
+                <span><strong id="trend-average">84</strong> average</span>
+                <span class="chart-foot-note">Illustrative history</span>
+              </div>
+            </article>
+
+            <article class="card trend-summary" aria-labelledby="trend-summary-title">
+              <div class="card-head">
                 <div>
-                  <strong>Connected Garage</strong>
-                  <span>Switch between your family cars or work vehicles</span>
+                  <h2 id="trend-summary-title">Highlights</h2>
+                  <p id="trend-summary-caption">Selected period at a glance.</p>
+                </div>
+                <span class="trend-summary-icon" aria-hidden="true">
+                  <i class="fa-solid fa-arrow-trend-up"></i>
+                </span>
+              </div>
+
+              <div class="trend-stats">
+                <div class="trend-stat">
+                  <span>Average</span>
+                  <strong id="trend-stat-average">84</strong>
+                  <small>out of 100</small>
+                </div>
+                <div class="trend-stat">
+                  <span>Best day</span>
+                  <strong id="trend-stat-best">87</strong>
+                  <small id="trend-stat-best-label">Oct 20</small>
+                </div>
+                <div class="trend-stat">
+                  <span>Lowest</span>
+                  <strong id="trend-stat-low">80</strong>
+                  <small id="trend-stat-low-label">Sep 21</small>
+                </div>
+                <div class="trend-stat">
+                  <span>Change</span>
+                  <strong id="trend-stat-change">+7</strong>
+                  <small>points in period</small>
                 </div>
               </div>
-              <i class="fa-solid fa-chevron-right text-muted"></i>
-            </button>
 
-            <button class="tool-btn" onclick="openSimModal()">
-              <div class="tb-left">
-                <i class="fa-solid fa-flask text-yellow"></i>
-                <div>
-                  <strong>Live Demo Test Lab</strong>
-                  <span>Test engine warning alerts and see how the app reacts</span>
-                </div>
+              <div class="trend-note">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span id="trend-note-text">No fault codes recorded in the selected period.</span>
               </div>
-              <i class="fa-solid fa-chevron-right text-muted"></i>
-            </button>
+            </article>
+
+            <article class="card chart-card chart-card--fuel">
+              <div class="card-head chart-head">
+                <div>
+                  <h2>Fuel economy</h2>
+                  <p>Weekly average, litres per 100 km.</p>
+                </div>
+                <span class="chip chip--good">Improving</span>
+              </div>
+
+              <div class="bar-chart" id="fuel-chart" role="img" aria-label="Weekly fuel economy for the last six weeks">
+                <div class="bar-columns" id="fuel-bars"></div>
+              </div>
+
+              <div class="chart-foot">
+                <span>Latest <strong id="fuel-latest">6.9 L/100 km</strong></span>
+                <span>6-week average <strong id="fuel-average">7.3 L/100 km</strong></span>
+              </div>
+            </article>
+
+            <article class="card chart-card chart-card--battery">
+              <div class="card-head chart-head">
+                <div>
+                  <h2>Battery voltage</h2>
+                  <p>Resting voltage, last 14 days.</p>
+                </div>
+                <span class="chip chip--good">Stable</span>
+              </div>
+
+              <div class="chart-kpis chart-kpis--small">
+                <div class="chart-kpi-main">
+                  <strong id="battery-latest">13.8</strong><span>V today</span>
+                </div>
+                <span class="chart-delta chart-delta--neutral" id="battery-delta">Normal range</span>
+              </div>
+
+              <div class="line-chart line-chart--compact" id="battery-chart" role="img" aria-label="Battery voltage over the last 14 days">
+                <div class="chart-y" id="battery-chart-y" aria-hidden="true"></div>
+                <div class="chart-plot">
+                  <svg class="chart-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="battery-area-fill" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#0b7a53" stop-opacity="0.14"></stop>
+                        <stop offset="100%" stop-color="#0b7a53" stop-opacity="0.01"></stop>
+                      </linearGradient>
+                    </defs>
+                    <g class="chart-grid" id="battery-chart-grid"></g>
+                    <path class="chart-area" id="battery-chart-area" fill="url(#battery-area-fill)" d=""></path>
+                    <path class="chart-line" id="battery-chart-line" d=""></path>
+                  </svg>
+                  <span class="chart-last-dot" id="battery-chart-dot" aria-hidden="true"></span>
+                </div>
+                <div class="chart-x" id="battery-chart-x" aria-hidden="true"></div>
+              </div>
+
+              <div class="chart-foot">
+                <span>14-day average <strong id="battery-average">13.7 V</strong></span>
+                <span class="chart-foot-note">12.4–12.8 V is low</span>
+              </div>
+            </article>
           </div>
-        </div>
+        </section>
 
-      </section>
+        <!-- =================================================================== -->
+        <!-- MAINTENANCE                                                         -->
+        <!-- =================================================================== -->
+        <section class="page" id="page-repairs" aria-labelledby="repairs-title">
+          <header class="page-head">
+            <div>
+              <p class="eyebrow">Plan &amp; protect</p>
+              <h1 id="repairs-title">Maintenance</h1>
+              <p class="page-sub">Catch small wear before it becomes an expensive repair.</p>
+            </div>
+          </header>
 
-    </main>
+          <div class="repairs-layout">
+            <article class="savings-card">
+              <div class="savings-top">
+                <div>
+                  <p class="eyebrow">Estimated savings</p>
+                  <div class="savings-amount"><span id="total-saved-display">₦3,450,000</span><span class="savings-plus">+</span></div>
+                  <p class="savings-copy">Avoided by fixing issues early, based on current service estimates.</p>
+                </div>
+                <span class="savings-icon"><i class="fa-solid fa-arrow-trend-down" aria-hidden="true"></i></span>
+              </div>
 
-    <!-- ===================================================================== -->
-    <!-- CLEAN 3-TAB BOTTOM NAVIGATION BAR (No dedicated chat bar)             -->
-    <!-- ===================================================================== -->
-    <nav class="app-bottom-nav">
-      <button class="nav-item active" id="tab-btn-health" onclick="switchTab('health')">
-        <i class="fa-solid fa-heart-pulse"></i>
-        <span>Health</span>
-      </button>
+              <div class="savings-foot">
+                <div>
+                  <strong id="repairs-count">2 open items</strong>
+                  <span>for this vehicle</span>
+                </div>
+                <button class="btn btn-secondary btn-sm" type="button" onclick="openCertModal()">
+                  <i class="fa-solid fa-file-lines" aria-hidden="true"></i> View report
+                </button>
+              </div>
+            </article>
 
-      <button class="nav-item" id="tab-btn-repairs" onclick="switchTab('repairs')">
-        <i class="fa-solid fa-screwdriver-wrench"></i>
-        <span>Repairs</span>
-      </button>
+            <div class="repairs-column">
+              <div class="section-head">
+                <div>
+                  <h2>Needs attention</h2>
+                  <p>Simulate a fix to see the health score respond.</p>
+                </div>
+              </div>
 
-      <button class="nav-item" id="tab-btn-assistant" onclick="switchTab('assistant')">
-        <i class="fa-solid fa-lightbulb"></i>
-        <span>Assistant</span>
-      </button>
-    </nav>
+              <div class="repairs-list" id="repairs-list">
+                <!-- Rendered by app.js -->
+              </div>
+            </div>
 
+            <article class="card wear-card">
+              <div class="card-head wear-head">
+                <div>
+                  <h2>Part life</h2>
+                  <p>Projected remaining life for your current driving style.</p>
+                </div>
+                <div class="segmented" role="group" aria-label="Driving style">
+                  <button class="seg-btn active" type="button" id="btn-style-gentle" onclick="setDriverStyle('gentle')" aria-pressed="true">Gentle</button>
+                  <button class="seg-btn" type="button" id="btn-style-city" onclick="setDriverStyle('city')" aria-pressed="false">City</button>
+                  <button class="seg-btn" type="button" id="btn-style-heavy" onclick="setDriverStyle('heavy')" aria-pressed="false">Heavy</button>
+                </div>
+              </div>
+
+              <div class="wear-list" id="wear-bars-container"><!-- Rendered by app.js --></div>
+              <p class="card-note">Estimates based on 12,400 km driven and manufacturer service intervals.</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- ASSISTANT                                                           -->
+        <!-- =================================================================== -->
+        <section class="page" id="page-assistant" aria-labelledby="assistant-title">
+          <header class="page-head">
+            <div>
+              <p class="eyebrow">Help &amp; records</p>
+              <h1 id="assistant-title">Assistant</h1>
+              <p class="page-sub">Plain-English answers, driving insights and vehicle tools.</p>
+            </div>
+          </header>
+
+          <button class="assistant-menu-toggle" id="assistant-menu-toggle" type="button" onclick="toggleAssistantMenu()" aria-expanded="false" aria-controls="assistant-side-panel">
+            <span class="assistant-menu-icon"><i class="fa-solid fa-bars" aria-hidden="true"></i></span>
+            <span class="assistant-menu-copy">
+              <strong>Predictive AI &amp; tools</strong>
+              <small>Anomaly insights, habits and vehicle records</small>
+            </span>
+            <i class="fa-solid fa-chevron-down assistant-menu-chevron" aria-hidden="true"></i>
+          </button>
+
+          <div class="assistant-layout" id="assistant-layout">
+            <div class="assistant-side" id="assistant-side-panel" role="region" aria-label="Predictive model, driving habits and vehicle tools">
+              <article class="card ai-model-card" id="ai-model-card" data-tone="good">
+                <div class="card-head">
+                  <div>
+                    <h2>Predictive model</h2>
+                    <p>Unsupervised anomaly detection on live telemetry.</p>
+                  </div>
+                  <span class="chip chip--good" id="ai-model-state">Normal</span>
+                </div>
+
+                <div class="ai-score-row">
+                  <div class="ai-score-number"><strong id="ai-risk-score">--</strong><span>/100</span></div>
+                  <div class="ai-score-copy">
+                    <strong id="ai-risk-label">Analysing</strong>
+                    <span id="ai-risk-summary">Learning the vehicle's normal operating envelope.</span>
+                  </div>
+                </div>
+                <div class="ai-meter" id="ai-meter" role="img" aria-label="Anomaly risk">
+                  <span id="ai-risk-meter"></span>
+                </div>
+
+                <div class="ai-fact-grid">
+                  <div><span>Nearest cluster</span><strong id="ai-cluster">--</strong></div>
+                  <div><span>Confidence</span><strong id="ai-confidence">--</strong></div>
+                  <div><span>Baseline</span><strong id="ai-samples">--</strong></div>
+                  <div><span>14-day view</span><strong id="ai-forecast">--</strong></div>
+                </div>
+
+                <div class="ai-signals" id="ai-signals">
+                  <div class="ai-signal">
+                    <span class="ai-signal-name"><span class="ai-signal-dot"></span>Waiting for telemetry</span>
+                    <strong>--</strong>
+                  </div>
+                </div>
+
+                <button class="btn btn-secondary btn-sm full-width ai-explain-btn" type="button" onclick="explainAiModel()">
+                  <i class="fa-solid fa-microchip" aria-hidden="true"></i> Explain this model
+                </button>
+              </article>
+
+              <article class="card habits-card">
+                <div class="card-head">
+                  <div>
+                    <h2>Driving habits</h2>
+                    <p>How smoothly you drive affects wear.</p>
+                  </div>
+                  <span class="chip chip--good">+₦4,440,000 / year</span>
+                </div>
+
+                <div class="habit-list">
+                  <div class="habit-row">
+                    <div class="habit-copy"><strong>Smooth braking</strong><span>Saves brake pads</span></div>
+                    <span class="habit-value">92%</span>
+                  </div>
+                  <div class="habit-bar"><span style="width:92%"></span></div>
+
+                  <div class="habit-row">
+                    <div class="habit-copy"><strong>Gentle starts</strong><span>Saves fuel</span></div>
+                    <span class="habit-value">88%</span>
+                  </div>
+                  <div class="habit-bar"><span style="width:88%"></span></div>
+
+                  <div class="habit-row">
+                    <div class="habit-copy"><strong>Low idling</strong><span>Keeps the engine clean</span></div>
+                    <span class="habit-value">95%</span>
+                  </div>
+                  <div class="habit-bar"><span style="width:95%"></span></div>
+                </div>
+              </article>
+
+              <article class="card tools-card">
+                <div class="card-head">
+                  <div>
+                    <h2>Vehicle tools</h2>
+                    <p>Records, vehicles and testing.</p>
+                  </div>
+                </div>
+
+                <div class="tool-list">
+                  <button class="tool-row" type="button" onclick="openAssistantTool('certificate')">
+                    <span class="tool-icon"><i class="fa-solid fa-file-shield" aria-hidden="true"></i></span>
+                    <span class="tool-copy"><strong>Health certificate</strong><span>Print or save a verified report</span></span>
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                  </button>
+
+                  <button class="tool-row" type="button" onclick="openAssistantTool('garage')">
+                    <span class="tool-icon"><i class="fa-solid fa-warehouse" aria-hidden="true"></i></span>
+                    <span class="tool-copy"><strong>Connected garage</strong><span>Switch between family vehicles</span></span>
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                  </button>
+
+                  <a class="tool-row tool-row--link" href="fleet.html">
+                    <span class="tool-icon"><i class="fa-solid fa-building-columns" aria-hidden="true"></i></span>
+                    <span class="tool-copy"><strong>Fleet portal</strong><span>Track multiple vehicles and brands</span></span>
+                    <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                  </a>
+
+                  <button class="tool-row" type="button" onclick="openAssistantTool('demo')">
+                    <span class="tool-icon"><i class="fa-solid fa-flask" aria-hidden="true"></i></span>
+                    <span class="tool-copy"><strong>Demo lab</strong><span>Test warnings without hardware</span></span>
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </article>
+            </div>
+
+            <article class="chat-card">
+              <div class="chat-head">
+                <span class="chat-avatar"><i class="fa-solid fa-user-gear" aria-hidden="true"></i></span>
+                <div class="chat-title">
+                  <h2>AI Mechanic</h2>
+                  <p><span class="status-dot" aria-hidden="true"></span>Online · local ML · anomaly model</p>
+                </div>
+              </div>
+
+              <div class="chat-model-strip">
+                <span><i class="fa-solid fa-microchip" aria-hidden="true"></i> Unsupervised model</span>
+                <strong id="chat-model-summary">Learning baseline…</strong>
+              </div>
+
+              <div class="chat-stream" id="assistant-chat-stream" aria-live="polite">
+                <div class="msg msg--bot">
+                  <p>Hi — I'm Orion's AI mechanic. I use a local TF-IDF intent model and an unsupervised k-means anomaly detector on your live telemetry.</p>
+                </div>
+                <div class="msg msg--bot">
+                  <p>Ask <strong>“What will fail next?”</strong> for a predictive scan, or ask about a system and I'll ground the answer in the model's signal scores.</p>
+                </div>
+              </div>
+
+              <div class="chat-chips" aria-label="Suggested questions">
+                <button class="chat-chip" type="button" onclick="askMechanicQuestion('Predict the next likely failure')">Predict next failure</button>
+                <button class="chat-chip" type="button" onclick="askMechanicQuestion('What looks anomalous right now?')">What looks anomalous?</button>
+                <button class="chat-chip" type="button" onclick="askMechanicQuestion('Why does the car feel like it runs warm?')">Why is the car warm?</button>
+                <button class="chat-chip" type="button" onclick="askMechanicQuestion('How long can I drive on my current brake pads?')">Brake pad life</button>
+                <button class="chat-chip" type="button" onclick="askMechanicQuestion('How does the unsupervised AI model work?')">How does the AI work?</button>
+              </div>
+
+              <form class="chat-form" id="assistant-form">
+                <label class="visually-hidden" for="assistant-input-field">Ask the mechanic a question</label>
+                <input class="chat-input" type="text" id="assistant-input-field" placeholder="Ask about your car…" autocomplete="off">
+                <button class="send-btn" type="submit" aria-label="Send message">
+                  <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+                </button>
+              </form>
+            </article>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Mobile navigation -->
+      <nav class="bottom-nav" aria-label="Mobile navigation">
+        <button class="nav-btn active" type="button" data-tab="health" aria-current="page">
+          <i class="fa-solid fa-heart-pulse" aria-hidden="true"></i>
+          <span>Health</span>
+        </button>
+        <button class="nav-btn" type="button" data-tab="trends">
+          <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+          <span>Trends</span>
+        </button>
+        <button class="nav-btn" type="button" data-tab="repairs">
+          <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>
+          <span>Maintenance</span>
+        </button>
+        <button class="nav-btn" type="button" data-tab="assistant">
+          <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
+          <span>Assistant</span>
+        </button>
+      </nav>
+    </div>
   </div>
 
+  <!-- ===================================================================== -->
+  <!-- MODALS                                                                -->
+  <!-- ===================================================================== -->
 
-  <!-- ========================================================================= -->
-  <!-- MODALS (GARAGE, AUDIT CERTIFICATE, DEMO SIMULATION)                       -->
-  <!-- ========================================================================= -->
-
-  <!-- Multi-Car Garage Modal -->
-  <div class="modal-overlay" id="garage-modal">
-    <div class="modal-window">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-warehouse text-cyan"></i> My Garage</h3>
-        <button class="modal-close-btn" onclick="closeGarageModal()"><i class="fa-solid fa-xmark"></i></button>
+  <div class="modal-overlay" id="garage-modal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="garage-title">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Connected garage</p>
+          <h2 id="garage-title">Choose a vehicle</h2>
+        </div>
+        <button class="icon-btn modal-close" type="button" data-close aria-label="Close garage">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
       </div>
-      <p class="modal-desc">Select a vehicle to inspect its live health status:</p>
+      <p class="modal-desc">Select a vehicle to inspect its live health status.</p>
 
       <div class="garage-list">
-        <div class="garage-item active" onclick="selectCar('suv')">
-          <div class="gi-info">
-            <strong>2024 Toyota RAV4 Hybrid</strong>
-            <span>Family SUV • License #7ABC123</span>
-          </div>
-          <div class="gi-score text-green">87 / 100</div>
-        </div>
+        <button class="garage-item active" type="button" data-car="suv" onclick="selectCar('suv')" aria-pressed="true">
+          <span class="garage-car">
+            <span class="garage-icon"><i class="fa-solid fa-car-side" aria-hidden="true"></i></span>
+            <span class="garage-copy"><strong>2024 Toyota RAV4 Hybrid</strong><small>Family SUV · 7ABC123</small></span>
+          </span>
+          <span class="garage-score"><strong data-score-for="suv">87</strong><small>/ 100</small><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+        </button>
 
-        <div class="garage-item" onclick="selectCar('sedan')">
-          <div class="gi-info">
-            <strong>2023 Honda Civic 2.0L</strong>
-            <span>Daily Commuter • License #9XYZ882</span>
-          </div>
-          <div class="gi-score text-green">95 / 100</div>
-        </div>
+        <button class="garage-item" type="button" data-car="sedan" onclick="selectCar('sedan')" aria-pressed="false">
+          <span class="garage-car">
+            <span class="garage-icon"><i class="fa-solid fa-car-side" aria-hidden="true"></i></span>
+            <span class="garage-copy"><strong>2023 Honda Civic 2.0L</strong><small>Daily commuter · 9XYZ882</small></span>
+          </span>
+          <span class="garage-score"><strong data-score-for="sedan">95</strong><small>/ 100</small><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+        </button>
 
-        <div class="garage-item" onclick="selectCar('truck')">
-          <div class="gi-info">
-            <strong>2022 Ford F-150 SuperCrew</strong>
-            <span>Utility Work Truck • License #4MNO456</span>
-          </div>
-          <div class="gi-score text-yellow">74 / 100</div>
-        </div>
+        <button class="garage-item" type="button" data-car="truck" onclick="selectCar('truck')" aria-pressed="false">
+          <span class="garage-car">
+            <span class="garage-icon"><i class="fa-solid fa-truck-pickup" aria-hidden="true"></i></span>
+            <span class="garage-copy"><strong>2022 Ford F-150 SuperCrew</strong><small>Work truck · 4MNO456</small></span>
+          </span>
+          <span class="garage-score"><strong data-score-for="truck">74</strong><small>/ 100</small><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- Official Health Audit Certificate Modal -->
-  <div class="modal-overlay" id="cert-modal">
-    <div class="modal-window">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-certificate text-green"></i> Vehicle Health Certificate</h3>
-        <button class="modal-close-btn" onclick="closeCertModal()"><i class="fa-solid fa-xmark"></i></button>
+  <div class="modal-overlay" id="cert-modal" aria-hidden="true">
+    <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="cert-modal-title">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Vehicle record</p>
+          <h2 id="cert-modal-title">Health certificate</h2>
+        </div>
+        <button class="icon-btn modal-close" type="button" data-close aria-label="Close certificate">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
       </div>
 
-      <div class="certificate-paper">
-        <div class="cert-badge">KOLLS VERIFIED HEALTH REPORT</div>
-        <h2 id="cert-title">2024 Toyota RAV4 Hybrid</h2>
-        <p class="cert-sub">Verified via live vehicle sensor and diagnostics scan</p>
+      <div class="cert-sheet">
+        <div class="cert-top">
+          <div class="cert-brand">
+            <span class="brand-mark brand-mark--sm"><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#orion-mark"></use></svg></span>
+            <span><strong>ORION</strong><small>A Kolls product</small></span>
+          </div>
+          <span class="chip chip--good">Verified report</span>
+        </div>
+
+        <div class="cert-title">
+          <p>Vehicle health certificate</p>
+          <h2 id="cert-title">2024 Toyota RAV4 Hybrid</h2>
+          <span>Generated from live vehicle diagnostics</span>
+        </div>
+
+        <div class="cert-score">
+          <div>
+            <span>Overall health</span>
+            <strong id="cert-score">87 / 100</strong>
+          </div>
+          <span class="status-pill status-pill--light" id="cert-status"><span class="status-dot"></span><span id="cert-status-text">Good condition</span></span>
+        </div>
 
         <div class="cert-grid">
-          <div><span>Overall Health:</span><strong class="text-green" id="cert-score">87 / 100 (Optimal)</strong></div>
-          <div><span>Engine & Transmission:</span><strong class="text-green">95% (Pass)</strong></div>
-          <div><span>Brakes & Chassis:</span><strong class="text-green">84% (Pass)</strong></div>
-          <div><span>Electrical System:</span><strong class="text-green">92% (Pass)</strong></div>
-          <div><span>Trouble Codes (DTC):</span><strong class="text-green">0 Pending Errors</strong></div>
-          <div><span>Date of Inspection:</span><strong>October 17, 2026</strong></div>
+          <div><span>Engine &amp; transmission</span><strong id="cert-engine">95% · Pass</strong></div>
+          <div><span>Cooling system</span><strong id="cert-cooling">78% · Monitor</strong></div>
+          <div><span>Battery &amp; charging</span><strong id="cert-electrical">92% · Pass</strong></div>
+          <div><span>Brakes &amp; chassis</span><strong id="cert-brakes">84% · Pass</strong></div>
+          <div><span>Inspection date</span><strong id="cert-date">October 20, 2026</strong></div>
+          <div><span>Fault codes</span><strong>0 pending</strong></div>
         </div>
 
-        <div class="cert-footer-code">
-          <span>Verification Hash:</span>
-          <strong>0x8F91A-KOLLS-AUTO-CERTIFIED</strong>
+        <div class="cert-foot">
+          <span>Verification ID</span>
+          <strong id="cert-hash">ORION-8F91A-2026</strong>
         </div>
       </div>
 
-      <button class="btn-primary-action full-width" onclick="window.print()">
-        <i class="fa-solid fa-print"></i> Print Official Report
-      </button>
+      <div class="modal-actions">
+        <button class="btn btn-primary full-width" type="button" onclick="window.print()">
+          <i class="fa-solid fa-print" aria-hidden="true"></i> Print report
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- Demo Test Lab Modal -->
-  <div class="modal-overlay" id="sim-modal">
-    <div class="modal-window">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-flask text-yellow"></i> Live Demo Test Lab</h3>
-        <button class="modal-close-btn" onclick="closeSimModal()"><i class="fa-solid fa-xmark"></i></button>
+  <div class="modal-overlay" id="sim-modal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sim-title">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Demo lab</p>
+          <h2 id="sim-title">Simulate a fault</h2>
+        </div>
+        <button class="icon-btn modal-close" type="button" data-close aria-label="Close demo lab">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
       </div>
-      <p class="modal-desc">Tap any scenario below to see how the app warns the driver:</p>
+      <p class="modal-desc">Choose a scenario to see how the dashboard responds. Values stay simulated until you reset.</p>
 
       <div class="demo-grid">
-        <button class="demo-btn" onclick="triggerTestScenario('overheat')">
-          <i class="fa-solid fa-fire text-red"></i>
-          <div>
-            <strong>High Engine Temp</strong>
-            <span>Simulate 112°C warm engine</span>
-          </div>
+        <button class="demo-option" type="button" onclick="triggerTestScenario('overheat')">
+          <span class="demo-icon demo-icon--danger"><i class="fa-solid fa-temperature-high" aria-hidden="true"></i></span>
+          <span class="demo-copy"><strong>Engine overheat</strong><span>112°C coolant, health drops</span></span>
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
         </button>
 
-        <button class="demo-btn" onclick="triggerTestScenario('battery')">
-          <i class="fa-solid fa-car-battery text-yellow"></i>
-          <div>
-            <strong>Low Battery Voltage</strong>
-            <span>Simulate 11.4V battery drop</span>
-          </div>
+        <button class="demo-option" type="button" onclick="triggerTestScenario('battery')">
+          <span class="demo-icon demo-icon--warn"><i class="fa-solid fa-car-battery" aria-hidden="true"></i></span>
+          <span class="demo-copy"><strong>Low battery</strong><span>11.4V charging fault</span></span>
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
         </button>
 
-        <button class="demo-btn" onclick="triggerTestScenario('tire')">
-          <i class="fa-solid fa-circle-exclamation text-yellow"></i>
-          <div>
-            <strong>Low Tire Pressure</strong>
-            <span>Simulate 24 PSI in Front Left</span>
-          </div>
+        <button class="demo-option" type="button" onclick="triggerTestScenario('tire')">
+          <span class="demo-icon demo-icon--warn"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i></span>
+          <span class="demo-copy"><strong>Low tire pressure</strong><span>Front left drops to 24 PSI</span></span>
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
         </button>
 
-        <button class="demo-btn" onclick="triggerTestScenario('reset')">
-          <i class="fa-solid fa-rotate-left text-green"></i>
-          <div>
-            <strong>Reset to Normal</strong>
-            <span>Restore all vehicle values</span>
-          </div>
+        <button class="demo-option" type="button" onclick="triggerTestScenario('reset')">
+          <span class="demo-icon demo-icon--good"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></span>
+          <span class="demo-copy"><strong>Reset to normal</strong><span>Restore the selected vehicle</span></span>
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Toast Notification Popup -->
-  <div class="toast-popup" id="toast-message"></div>
+  <div class="toast-popup" id="toast-message" role="status" aria-live="polite">
+    <span class="toast-icon"><i class="fa-solid fa-check" id="toast-icon" aria-hidden="true"></i></span>
+    <span id="toast-text"></span>
+  </div>
 
-  <script src="app.js?v=4.0"></script>
+  <script src="mqtt.min.js?v=5.10.4"></script>
+  <script src="live-telemetry.js?v=1.1"></script>
+  <script src="ai-engine.js?v=1.1"></script>
+  <script src="app.js?v=12.1"></script>
 </body>
 </html>

@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Orion Fleet by Kolls — a multi-vehicle command centre for fleet managers to track health, location, service and alerts across every brand.">
+  <meta name="theme-color" content="#f4f4f1">
+  <title>Orion Fleet — Operations Portal</title>
+
+  <link rel="icon" type="image/svg+xml" href="logo.svg?v=3">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <link rel="stylesheet" href="styles.css?v=13.0">
+  <link rel="stylesheet" href="fleet.css?v=1.1">
+</head>
+<body class="fleet-body">
+  <svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <symbol id="orion-mark" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 24 13.2 18.1 18 14.2 21.8 10.4"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="8" cy="24" r="1.9"/>
+        <circle cx="13.2" cy="18.1" r="1.9"/>
+        <circle cx="18" cy="14.2" r="1.9"/>
+      </g>
+      <path d="M23.4 4.8 24.5 7.9 27.6 9 24.5 10.1 23.4 13.2 22.3 10.1 19.2 9 22.3 7.9Z" fill="var(--accent-bright)"/>
+      <circle cx="8.6" cy="8.4" r="1" fill="currentColor" opacity=".5"/>
+      <circle cx="26" cy="24.2" r="1" fill="currentColor" opacity=".5"/>
+    </symbol>
+  </svg>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <div class="app-shell fleet-shell">
+
+    <!-- Desktop navigation -->
+    <aside class="sidebar fleet-sidebar" aria-label="Fleet workspace">
+      <a class="brand" href="index.html" aria-label="Orion single-vehicle app">
+        <span class="brand-mark"><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#orion-mark"></use></svg></span>
+        <span class="brand-text"><strong>ORION</strong><small>Fleet by Kolls</small></span>
+      </a>
+
+      <div class="fleet-workspace">
+        <span class="fleet-workspace-icon"><i class="fa-solid fa-building" aria-hidden="true"></i></span>
+        <span class="fleet-workspace-copy"><small>Workspace</small><strong>Orion Fleet</strong></span>
+        <span class="fleet-workspace-tag">Live</span>
+      </div>
+
+      <nav class="side-nav" aria-label="Fleet navigation">
+        <p class="nav-label">Command centre</p>
+        <button class="nav-btn active" type="button" data-fleet-page="overview" aria-current="page">
+          <i class="fa-solid fa-grid-2" aria-hidden="true"></i>
+          <span>Overview</span>
+        </button>
+        <button class="nav-btn" type="button" data-fleet-page="vehicles">
+          <i class="fa-solid fa-car-side" aria-hidden="true"></i>
+          <span>Vehicles</span>
+          <span class="fleet-nav-badge" id="nav-vehicle-count">10</span>
+        </button>
+        <button class="nav-btn" type="button" data-fleet-page="tracking">
+          <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>
+          <span>Live tracking</span>
+        </button>
+        <button class="nav-btn" type="button" data-fleet-page="maintenance">
+          <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>
+          <span>Maintenance</span>
+        </button>
+        <button class="nav-btn" type="button" data-fleet-page="alerts">
+          <i class="fa-solid fa-bell" aria-hidden="true"></i>
+          <span>Alerts</span>
+          <span class="fleet-nav-badge" id="nav-alert-count">0</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a class="sidebar-demo fleet-sidebar-link" href="index.html">
+          <span class="sidebar-demo-icon"><i class="fa-solid fa-car" aria-hidden="true"></i></span>
+          <span class="sidebar-demo-copy">
+            <strong>Single-vehicle app</strong>
+            <small>Open the driver dashboard</small>
+          </span>
+          <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+        </a>
+
+        <p class="fleet-demo-note" id="fleet-data-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Sample telemetry for demonstration. The live ESP32 gateway updates this portal when it connects.</p>
+        <p class="version">Orion Fleet · v1.0</p>
+      </div>
+    </aside>
+
+    <!-- Application -->
+    <div class="app-main">
+
+      <header class="topbar fleet-topbar">
+        <div class="topbar-brand">
+          <span class="brand-mark brand-mark--sm"><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><use href="#orion-mark"></use></svg></span>
+          <strong>ORION</strong>
+          <span class="fleet-topbar-tag">Fleet</span>
+        </div>
+
+        <div class="topbar-context">
+          <span class="status-dot status-dot--dark" aria-hidden="true"></span>
+          <span>Fleet workspace</span>
+          <span class="dot-sep" aria-hidden="true">·</span>
+          <span id="context-vehicle-count">10 vehicles</span>
+        </div>
+
+        <div class="topbar-right">
+          <label class="fleet-search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <span class="visually-hidden">Search fleet by vehicle, plate or driver</span>
+            <input type="search" id="global-vehicle-search" placeholder="Search fleet" autocomplete="off" spellcheck="false">
+          </label>
+
+          <button class="icon-btn fleet-bell" type="button" onclick="showPage('alerts')" aria-label="Open fleet alerts">
+            <i class="fa-solid fa-bell" aria-hidden="true"></i>
+            <span class="fleet-bell-badge" id="bell-alert-count">0</span>
+          </button>
+
+          <div class="fleet-user" title="Fleet manager · Adaeze Okonkwo">
+            <span class="fleet-avatar">AO</span>
+            <span class="fleet-user-copy"><strong>Adaeze O.</strong><small>Fleet manager</small></span>
+          </div>
+        </div>
+      </header>
+
+      <main class="content fleet-content" id="main-content" tabindex="-1">
+
+        <!-- =================================================================== -->
+        <!-- OVERVIEW                                                            -->
+        <!-- =================================================================== -->
+        <section class="page active" id="fleet-page-overview" aria-labelledby="fleet-overview-title">
+          <header class="page-head fleet-page-head">
+            <div>
+              <p class="eyebrow">Fleet command centre</p>
+              <h1 id="fleet-overview-title">Overview</h1>
+              <p class="page-sub">
+                <span id="overview-date">Tuesday, 20 October</span>
+                <span class="dot-sep" aria-hidden="true">·</span>
+                <span class="fleet-sample-label" id="fleet-sample-label"><span class="status-dot" aria-hidden="true"></span> Sample telemetry</span>
+              </p>
+            </div>
+            <div class="page-head-actions fleet-head-actions">
+              <button class="btn btn-secondary" type="button" onclick="openImportModal()">
+                <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
+                <span>Import</span>
+              </button>
+              <button class="btn btn-primary" type="button" onclick="openAddVehicleModal()">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                <span>Add vehicle</span>
+              </button>
+            </div>
+          </header>
+
+          <article class="fleet-live-device" id="fleet-live-device" data-state="offline">
+            <div class="fleet-live-device-main">
+              <span class="fleet-live-device-icon"><i class="fa-solid fa-microchip" aria-hidden="true"></i></span>
+              <div>
+                <p class="eyebrow">ESP32 gateway</p>
+                <h2 id="fleet-device-title">Waiting for KA-TRUCK-001</h2>
+                <p id="fleet-device-sub">Connect the vehicle gateway to stream live OBD-II telemetry into the fleet.</p>
+              </div>
+            </div>
+            <div class="fleet-live-device-metrics">
+              <div><span>RPM</span><strong id="fleet-device-rpm">--</strong></div>
+              <div><span>Coolant</span><strong id="fleet-device-coolant">--</strong></div>
+              <div><span>Battery</span><strong id="fleet-device-battery">--</strong></div>
+              <div><span>Status</span><strong id="fleet-device-status">--</strong></div>
+            </div>
+            <span class="chip chip--quiet" id="fleet-device-chip">Offline</span>
+          </article>
+
+          <div class="fleet-kpi-grid" aria-label="Fleet summary">
+            <article class="fleet-kpi fleet-kpi--accent">
+              <div class="fleet-kpi-top">
+                <span class="fleet-kpi-label">Fleet size</span>
+                <span class="fleet-kpi-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+              </div>
+              <strong class="fleet-kpi-value" id="kpi-total">10</strong>
+              <span class="fleet-kpi-meta" id="kpi-total-meta">across 8 brands</span>
+              <span class="fleet-kpi-foot"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> All records synced</span>
+            </article>
+
+            <article class="fleet-kpi">
+              <div class="fleet-kpi-top">
+                <span class="fleet-kpi-label">Active now</span>
+                <span class="fleet-kpi-icon fleet-kpi-icon--good"><i class="fa-solid fa-car-side" aria-hidden="true"></i></span>
+              </div>
+              <strong class="fleet-kpi-value" id="kpi-active">6</strong>
+              <span class="fleet-kpi-meta">vehicles moving today</span>
+              <span class="fleet-kpi-foot fleet-kpi-foot--good"><span class="status-dot" aria-hidden="true"></span><span id="kpi-active-detail">60% of fleet</span></span>
+            </article>
+
+            <article class="fleet-kpi">
+              <div class="fleet-kpi-top">
+                <span class="fleet-kpi-label">Needs attention</span>
+                <span class="fleet-kpi-icon fleet-kpi-icon--warn"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
+              </div>
+              <strong class="fleet-kpi-value" id="kpi-attention">3</strong>
+              <span class="fleet-kpi-meta">vehicles with open issues</span>
+              <span class="fleet-kpi-foot fleet-kpi-foot--warn"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i><span id="kpi-attention-detail">2 need service</span></span>
+            </article>
+
+            <article class="fleet-kpi">
+              <div class="fleet-kpi-top">
+                <span class="fleet-kpi-label">Fleet health</span>
+                <span class="fleet-kpi-icon fleet-kpi-icon--good"><i class="fa-solid fa-heart-pulse" aria-hidden="true"></i></span>
+              </div>
+              <strong class="fleet-kpi-value" id="kpi-health">84</strong>
+              <span class="fleet-kpi-meta">average health score</span>
+              <span class="fleet-kpi-foot fleet-kpi-foot--good"><i class="fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span id="kpi-health-detail">+2.4 vs last month</span></span>
+            </article>
+          </div>
+
+          <div class="fleet-overview-grid">
+            <article class="fleet-map-card fleet-map-card--overview">
+              <div class="fleet-map-head">
+                <div>
+                  <p class="eyebrow">Live operations</p>
+                  <h2>Fleet on the move</h2>
+                  <p>Current vehicle locations across the Lagos network.</p>
+                </div>
+                <button class="link-btn fleet-link-btn" type="button" onclick="showPage('tracking')">
+                  Open live map <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </button>
+              </div>
+              <div class="fleet-map fleet-map--overview" id="overview-map" role="img" aria-label="Sample map showing active fleet vehicles around Lagos"></div>
+              <div class="fleet-map-foot">
+                <span><span class="status-dot" aria-hidden="true"></span><strong id="map-moving-count">6</strong> moving now</span>
+                <span><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Updated just now</span>
+              </div>
+            </article>
+
+            <article class="card fleet-health-card">
+              <div class="card-head">
+                <div>
+                  <h2>Fleet health</h2>
+                  <p>Condition across every vehicle.</p>
+                </div>
+                <span class="chip chip--good" id="fleet-health-chip">Healthy</span>
+              </div>
+
+              <div class="fleet-health-body">
+                <div class="fleet-donut" id="fleet-health-donut" role="img" aria-label="Fleet health distribution">
+                  <span class="fleet-donut-center"><strong id="fleet-donut-value">84</strong><small>avg. score</small></span>
+                </div>
+                <div class="fleet-legend">
+                  <div class="fleet-legend-row"><span class="fleet-legend-dot fleet-legend-dot--good"></span><span>Healthy</span><strong id="legend-good">7</strong></div>
+                  <div class="fleet-legend-row"><span class="fleet-legend-dot fleet-legend-dot--warn"></span><span>Watch</span><strong id="legend-watch">2</strong></div>
+                  <div class="fleet-legend-row"><span class="fleet-legend-dot fleet-legend-dot--danger"></span><span>Critical</span><strong id="legend-critical">1</strong></div>
+                </div>
+              </div>
+
+              <div class="fleet-brand-strip">
+                <span class="fleet-brand-strip-label">Brands in fleet</span>
+                <div class="fleet-brand-chips" id="fleet-brand-chips"></div>
+              </div>
+
+              <button class="fleet-card-link" type="button" onclick="showPage('vehicles')">
+                Review all vehicles <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+              </button>
+            </article>
+
+            <article class="card fleet-table-card">
+              <div class="card-head">
+                <div>
+                  <h2>Vehicles at a glance</h2>
+                  <p>Prioritised by health and open alerts.</p>
+                </div>
+                <button class="link-btn fleet-link-btn fleet-link-btn--dark" type="button" onclick="showPage('vehicles')">
+                  View all <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </button>
+              </div>
+              <div class="fleet-table-wrap">
+                <table class="fleet-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Vehicle</th>
+                      <th scope="col">Status</th>
+                      <th scope="col" class="fleet-col-driver">Driver</th>
+                      <th scope="col" class="fleet-col-location">Location</th>
+                      <th scope="col">Health</th>
+                      <th scope="col"><span class="visually-hidden">Open</span></th>
+                    </tr>
+                  </thead>
+                  <tbody id="overview-vehicle-rows"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="card fleet-alerts-card">
+              <div class="card-head">
+                <div>
+                  <h2>Latest alerts</h2>
+                  <p>Newest issues from the fleet.</p>
+                </div>
+                <button class="link-btn fleet-link-btn fleet-link-btn--dark" type="button" onclick="showPage('alerts')">
+                  View all <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </button>
+              </div>
+              <div class="fleet-mini-alerts" id="overview-alert-list"></div>
+            </article>
+
+            <article class="card fleet-activity-card">
+              <div class="card-head">
+                <div>
+                  <h2>Fleet activity</h2>
+                  <p>Trips completed over the last seven days.</p>
+                </div>
+                <span class="chip chip--quiet"><i class="fa-solid fa-chart-column" aria-hidden="true"></i> Weekly</span>
+              </div>
+              <div class="fleet-activity-body">
+                <div class="fleet-activity-summary">
+                  <strong id="activity-total">248</strong>
+                  <span>trips this week</span>
+                  <small><i class="fa-solid fa-arrow-trend-up" aria-hidden="true"></i> 12% more than last week</small>
+                </div>
+                <div class="fleet-activity-chart" id="fleet-activity-chart" role="img" aria-label="Weekly trip activity"></div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- VEHICLES                                                            -->
+        <!-- =================================================================== -->
+        <section class="page" id="fleet-page-vehicles" aria-labelledby="fleet-vehicles-title">
+          <header class="page-head fleet-page-head">
+            <div>
+              <p class="eyebrow">Fleet inventory</p>
+              <h1 id="fleet-vehicles-title">Vehicles</h1>
+              <p class="page-sub"><span id="vehicles-count">10 vehicles</span><span class="dot-sep" aria-hidden="true">·</span><span>Every brand, one view</span></p>
+            </div>
+            <div class="page-head-actions fleet-head-actions">
+              <button class="btn btn-secondary" type="button" onclick="openImportModal()">
+                <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
+                <span>Import CSV</span>
+              </button>
+              <button class="btn btn-primary" type="button" onclick="openAddVehicleModal()">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                <span>Add vehicle</span>
+              </button>
+            </div>
+          </header>
+
+          <div class="fleet-toolbar" aria-label="Vehicle filters">
+            <label class="fleet-search-field">
+              <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+              <span class="visually-hidden">Search vehicles</span>
+              <input type="search" id="vehicle-search" placeholder="Search make, model, plate or driver" autocomplete="off" spellcheck="false">
+            </label>
+
+            <label class="fleet-select-wrap">
+              <span class="visually-hidden">Filter by status</span>
+              <select id="status-filter" class="fleet-select">
+                <option value="all">All statuses</option>
+                <option value="active">Moving</option>
+                <option value="idle">Idle</option>
+                <option value="service">Service</option>
+                <option value="alert">Attention</option>
+              </select>
+              <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+            </label>
+
+            <label class="fleet-select-wrap">
+              <span class="visually-hidden">Filter by brand</span>
+              <select id="brand-filter" class="fleet-select">
+                <option value="all">All brands</option>
+              </select>
+              <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+            </label>
+
+            <label class="fleet-select-wrap">
+              <span class="visually-hidden">Sort vehicles</span>
+              <select id="sort-filter" class="fleet-select">
+                <option value="attention">Sort: attention first</option>
+                <option value="health">Health: low to high</option>
+                <option value="name">Name: A–Z</option>
+                <option value="recent">Recently added</option>
+              </select>
+              <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+            </label>
+          </div>
+
+          <div class="fleet-result-bar">
+            <span id="vehicle-result-count">Showing 10 vehicles</span>
+            <button class="fleet-clear-btn" type="button" id="clear-filters" onclick="clearVehicleFilters()" hidden>Clear filters</button>
+          </div>
+
+          <div class="fleet-vehicle-grid" id="vehicle-grid"></div>
+          <div class="fleet-empty" id="vehicle-empty" hidden>
+            <span class="fleet-empty-icon"><i class="fa-solid fa-car-side" aria-hidden="true"></i></span>
+            <h2>No vehicles match</h2>
+            <p>Try a different search or clear the filters. You can also add a new vehicle.</p>
+            <button class="btn btn-primary" type="button" onclick="clearVehicleFilters()">Clear filters</button>
+          </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- TRACKING                                                            -->
+        <!-- =================================================================== -->
+        <section class="page" id="fleet-page-tracking" aria-labelledby="fleet-tracking-title">
+          <header class="page-head fleet-page-head">
+            <div>
+              <p class="eyebrow">Movement &amp; location</p>
+              <h1 id="fleet-tracking-title">Live tracking</h1>
+              <p class="page-sub"><span class="fleet-sample-label"><span class="status-dot" aria-hidden="true"></span> Sample locations</span><span class="dot-sep" aria-hidden="true">·</span><span>Lagos operations</span></p>
+            </div>
+            <div class="page-head-actions fleet-head-actions">
+              <span class="fleet-live-pill"><span class="live-dot" aria-hidden="true"></span> Live feed</span>
+            </div>
+          </header>
+
+          <div class="fleet-tracking-layout">
+            <article class="fleet-map-card fleet-map-card--large">
+              <div class="fleet-map-head fleet-map-head--tracking">
+                <div>
+                  <h2>Fleet map</h2>
+                  <p>Select a vehicle to see its profile.</p>
+                </div>
+                <div class="fleet-map-filters" role="group" aria-label="Map vehicle filter">
+                  <button class="filter-chip active" type="button" data-track-filter="all">All</button>
+                  <button class="filter-chip" type="button" data-track-filter="active">Moving</button>
+                  <button class="filter-chip" type="button" data-track-filter="idle">Idle</button>
+                  <button class="filter-chip" type="button" data-track-filter="service">Service</button>
+                </div>
+              </div>
+              <div class="fleet-map fleet-map--tracking" id="tracking-map" role="img" aria-label="Sample map showing fleet vehicle locations"></div>
+              <div class="fleet-map-foot">
+                <span><i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Locations are illustrative</span>
+                <span><span class="status-dot" aria-hidden="true"></span> <strong id="tracking-visible-count">10</strong> vehicles shown</span>
+              </div>
+            </article>
+
+            <aside class="fleet-tracking-side">
+              <article class="card fleet-tracking-card">
+                <div class="card-head">
+                  <div>
+                    <h2>Vehicles</h2>
+                    <p>Tap one to open its live profile.</p>
+                  </div>
+                  <span class="chip chip--quiet" id="tracking-list-count">10</span>
+                </div>
+                <div class="fleet-tracking-list" id="tracking-list"></div>
+              </article>
+
+              <article class="card fleet-tracking-summary">
+                <div class="card-head">
+                  <div>
+                    <h2>Today at a glance</h2>
+                    <p>Fleet movement since midnight.</p>
+                  </div>
+                </div>
+                <div class="fleet-tracking-stats">
+                  <div><span>Distance</span><strong>1,284 km</strong></div>
+                  <div><span>Trips</span><strong>38</strong></div>
+                  <div><span>Idle time</span><strong>4h 20m</strong></div>
+                  <div><span>Utilisation</span><strong>72%</strong></div>
+                </div>
+              </article>
+            </aside>
+          </div>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- MAINTENANCE                                                         -->
+        <!-- =================================================================== -->
+        <section class="page" id="fleet-page-maintenance" aria-labelledby="fleet-maintenance-title">
+          <header class="page-head fleet-page-head">
+            <div>
+              <p class="eyebrow">Service planning</p>
+              <h1 id="fleet-maintenance-title">Maintenance</h1>
+              <p class="page-sub">Keep every vehicle road-ready and control workshop spend.</p>
+            </div>
+            <div class="page-head-actions fleet-head-actions">
+              <button class="btn btn-secondary" type="button" onclick="showPage('vehicles')">
+                <i class="fa-solid fa-car-side" aria-hidden="true"></i>
+                <span>Vehicle list</span>
+              </button>
+            </div>
+          </header>
+
+          <div class="fleet-kpi-grid fleet-kpi-grid--service" aria-label="Maintenance summary">
+            <article class="fleet-service-stat">
+              <span class="fleet-service-stat-icon fleet-kpi-icon--warn"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i></span>
+              <div><span>Due this week</span><strong id="service-due-count">0</strong></div>
+            </article>
+            <article class="fleet-service-stat">
+              <span class="fleet-service-stat-icon fleet-kpi-icon--danger"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i></span>
+              <div><span>Overdue</span><strong id="service-overdue-count">0</strong></div>
+            </article>
+            <article class="fleet-service-stat">
+              <span class="fleet-service-stat-icon fleet-kpi-icon--good"><i class="fa-solid fa-naira-sign" aria-hidden="true"></i></span>
+              <div><span>Upcoming estimate</span><strong id="service-estimate-total">₦0</strong></div>
+            </article>
+            <article class="fleet-service-stat">
+              <span class="fleet-service-stat-icon fleet-kpi-icon--neutral"><i class="fa-solid fa-check-double" aria-hidden="true"></i></span>
+              <div><span>Completed this month</span><strong id="service-completed-count">18</strong></div>
+            </article>
+          </div>
+
+          <article class="card fleet-maintenance-card">
+            <div class="card-head">
+              <div>
+                <h2>Service queue</h2>
+                <p>Ordered by urgency. Estimates are sample workshop rates.</p>
+              </div>
+              <span class="chip chip--quiet" id="service-queue-count">0 items</span>
+            </div>
+            <div class="fleet-service-list" id="maintenance-list"></div>
+          </article>
+        </section>
+
+        <!-- =================================================================== -->
+        <!-- ALERTS                                                              -->
+        <!-- =================================================================== -->
+        <section class="page" id="fleet-page-alerts" aria-labelledby="fleet-alerts-title">
+          <header class="page-head fleet-page-head">
+            <div>
+              <p class="eyebrow">Risk &amp; response</p>
+              <h1 id="fleet-alerts-title">Alerts</h1>
+              <p class="page-sub">Everything that needs a fleet manager's attention.</p>
+            </div>
+            <div class="page-head-actions fleet-head-actions">
+              <button class="btn btn-secondary" type="button" onclick="markAllAlertsReviewed()">
+                <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                <span>Mark all reviewed</span>
+              </button>
+            </div>
+          </header>
+
+          <div class="fleet-alert-toolbar">
+            <div class="fleet-map-filters" role="group" aria-label="Filter alerts">
+              <button class="filter-chip active" type="button" data-alert-filter="all">All</button>
+              <button class="filter-chip" type="button" data-alert-filter="critical">Critical</button>
+              <button class="filter-chip" type="button" data-alert-filter="warning">Warning</button>
+              <button class="filter-chip" type="button" data-alert-filter="info">Info</button>
+            </div>
+            <span class="fleet-alert-count-label" id="open-alert-count">0 open alerts</span>
+          </div>
+
+          <div class="fleet-alert-list" id="alert-list"></div>
+          <div class="fleet-empty fleet-empty--alerts" id="alert-empty" hidden>
+            <span class="fleet-empty-icon fleet-empty-icon--good"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+            <h2>You're all caught up</h2>
+            <p>No open alerts in this view. New issues will appear here automatically.</p>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Mobile navigation -->
+      <nav class="bottom-nav fleet-bottom-nav" aria-label="Mobile fleet navigation">
+        <button class="nav-btn active" type="button" data-fleet-page="overview" aria-current="page">
+          <i class="fa-solid fa-grid-2" aria-hidden="true"></i>
+          <span>Overview</span>
+        </button>
+        <button class="nav-btn" type="button" data-fleet-page="vehicles">
+          <i class="fa-solid fa-car-side" aria-hidden="true"></i>
+          <span>Vehicles</span>
+        </button>
+        <button class="nav-btn" type="button" data-fleet-page="tracking">
+          <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>
+          <span>Tracking</span>
+        </button>
+        <button class="nav-btn" type="button" data-fleet-page="maintenance">
+          <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>
+          <span>Service</span>
+        </button>
+        <button class="nav-btn" type="button" data-fleet-page="alerts">
+          <i class="fa-solid fa-bell" aria-hidden="true"></i>
+          <span>Alerts</span>
+          <span class="fleet-nav-badge" id="mobile-alert-count">0</span>
+        </button>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Vehicle profile drawer -->
+  <div class="fleet-drawer-overlay" id="vehicle-drawer-overlay" aria-hidden="true">
+    <aside class="fleet-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-vehicle-name">
+      <div class="fleet-drawer-bar">
+        <span class="fleet-drawer-kicker">Vehicle profile</span>
+        <button class="icon-btn" type="button" data-drawer-close aria-label="Close vehicle profile">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="vehicle-drawer-body"></div>
+    </aside>
+  </div>
+
+  <!-- Add vehicle modal -->
+  <div class="modal-overlay" id="add-vehicle-modal" aria-hidden="true">
+    <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="add-vehicle-title">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Fleet inventory</p>
+          <h2 id="add-vehicle-title">Add a vehicle</h2>
+        </div>
+        <button class="icon-btn modal-close" type="button" data-close aria-label="Close add vehicle form">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <p class="modal-desc">Register any brand or model. The vehicle starts as idle until an Orion device is paired.</p>
+
+      <form id="add-vehicle-form" novalidate>
+        <div class="fleet-form-grid">
+          <label class="form-field">
+            <span>Brand</span>
+            <input type="text" name="make" list="fleet-brand-options" placeholder="e.g. Toyota" required autocomplete="off">
+          </label>
+          <label class="form-field">
+            <span>Model</span>
+            <input type="text" name="model" placeholder="e.g. Hilux" required autocomplete="off">
+          </label>
+          <label class="form-field">
+            <span>Year</span>
+            <input type="number" name="year" min="1980" max="2027" placeholder="2024" required inputmode="numeric">
+          </label>
+          <label class="form-field">
+            <span>Body type</span>
+            <select name="type">
+              <option>SUV</option>
+              <option>Sedan</option>
+              <option>Pickup</option>
+              <option>Van</option>
+              <option>Truck</option>
+              <option>Bus</option>
+              <option>EV</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span>Plate number</span>
+            <input type="text" name="plate" placeholder="LAG-482-KJ" required autocomplete="off">
+          </label>
+          <label class="form-field">
+            <span>VIN <small>(optional)</small></span>
+            <input type="text" name="vin" placeholder="17-character VIN" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="form-field">
+            <span>Driver</span>
+            <input type="text" name="driver" placeholder="Assign a driver" autocomplete="off">
+          </label>
+          <label class="form-field">
+            <span>Branch</span>
+            <select name="branch">
+              <option>Lekki</option>
+              <option>Victoria Island</option>
+              <option>Ikoyi</option>
+              <option>Ikeja</option>
+              <option>Yaba</option>
+              <option>Gbagada</option>
+              <option>Apapa</option>
+              <option>Surulere</option>
+              <option>Oshodi</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span>Odometer (km)</span>
+            <input type="number" name="odometer" min="0" step="1" placeholder="12400" inputmode="numeric">
+          </label>
+          <label class="form-field">
+            <span>Fuel / energy</span>
+            <select name="energy">
+              <option>Petrol</option>
+              <option>Diesel</option>
+              <option>Hybrid</option>
+              <option>Electric</option>
+            </select>
+          </label>
+        </div>
+
+        <datalist id="fleet-brand-options">
+          <option value="Toyota"></option>
+          <option value="Honda"></option>
+          <option value="Ford"></option>
+          <option value="Mercedes-Benz"></option>
+          <option value="Hyundai"></option>
+          <option value="Isuzu"></option>
+          <option value="Peugeot"></option>
+          <option value="Tesla"></option>
+          <option value="Kia"></option>
+          <option value="Nissan"></option>
+          <option value="Volkswagen"></option>
+          <option value="Mitsubishi"></option>
+          <option value="Mack"></option>
+          <option value="MAN"></option>
+        </datalist>
+
+        <p class="fleet-form-error" id="add-vehicle-error" role="alert" hidden></p>
+        <p class="fleet-form-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Vehicle records are saved to this browser for this demo.</p>
+
+        <div class="modal-actions fleet-form-actions">
+          <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add vehicle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bulk import modal -->
+  <div class="modal-overlay" id="import-vehicles-modal" aria-hidden="true">
+    <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="import-vehicles-title">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Bulk onboarding</p>
+          <h2 id="import-vehicles-title">Import vehicles</h2>
+        </div>
+        <button class="icon-btn modal-close" type="button" data-close aria-label="Close import form">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <p class="modal-desc">Paste one vehicle per line using this order: <strong>brand, model, year, type, plate, driver, branch, odometer</strong>.</p>
+
+      <form id="import-vehicles-form" novalidate>
+        <label class="form-field form-field--full">
+          <span>Vehicle rows</span>
+          <textarea name="rows" rows="8" placeholder="Toyota, Hilux, 2023, Pickup, LAG-902-XA, Musa Bello, Apapa, 48200&#10;Nissan, Urvan, 2021, Van, KJA-110-BC, Unassigned, Ikeja, 76500"></textarea>
+        </label>
+        <p class="fleet-form-error" id="import-vehicles-error" role="alert" hidden></p>
+        <p class="fleet-form-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Simple comma-separated rows. Duplicate plate numbers are skipped.</p>
+        <div class="modal-actions fleet-form-actions">
+          <button class="btn btn-secondary" type="button" data-close>Cancel</button>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i> Import vehicles</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-popup" id="fleet-toast" role="status" aria-live="polite">
+    <span class="toast-icon"><i class="fa-solid fa-check" id="fleet-toast-icon" aria-hidden="true"></i></span>
+    <span id="fleet-toast-text"></span>
+  </div>
+
+  <script src="mqtt.min.js?v=5.10.4"></script>
+  <script src="live-telemetry.js?v=1.1"></script>
+  <script src="fleet.js?v=1.2"></script>
+</body>
+</html>

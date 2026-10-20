@@ -1,0 +1,198 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 700" width="1100" height="700" xmlns="http://www.w3.org/2000/svg">
+<style>
+  :root {
+    --bg: #0b1220; --card: #162033; --border: #334155; --fg: #e5e7eb; --muted: #94a3b8;
+    --power: #ef4444; --gnd: #cbd5e1; --can-h: #f59e0b; --can-l: #3b82f6;
+    --spi: #a78bfa; --data: #10b981; --unused: #64748b; --cut: #ef4444; --brand: #22d3ee;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; }
+  header { text-align: center; margin-bottom: 8px; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; color: var(--brand); }
+  h2 { font-size: 1.05rem; margin: 26px 0 8px; color: var(--brand); }
+  .sub { color: var(--muted); font-size: .9rem; }
+  svg { width: 100%; max-width: 1080px; display: block; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+  .comp { fill: #1e293b; stroke: var(--border); stroke-width: 2; rx: 8; }
+  .wire { fill: none; stroke-width: 2.5; }
+  text  { fill: var(--fg); font-family: ui-monospace, monospace; }
+  .lbl  { font-size: 12px; font-weight: 700; }
+  .pin  { font-size: 10px; fill: var(--muted); }
+  .note { font-size: 10px; fill: var(--muted); }
+  .cutx { stroke: var(--cut); stroke-width: 2.5; }
+  table { width: 100%; max-width: 1080px; margin: 10px auto 0; border-collapse: collapse; font-size: .82rem; }
+  th, td { border: 1px solid var(--border); padding: 5px 9px; text-align: left; }
+  th { background: #1e293b; color: var(--brand); }
+  .ok { color: #4ade80; } .warn { color: #fbbf24; } .crit { color: #f87171; }
+  ul.check { max-width: 1080px; margin: 10px auto; font-size: .85rem; color: var(--muted); line-height: 1.75; }
+
+text{font-family:ui-monospace,Consolas,monospace}</style>
+
+  <!-- ---------------- OBD-II ---------------- -->
+  <rect class="comp" x="20" y="160" width="170" height="270" stroke="#f59e0b"/>
+  <text class="lbl" x="105" y="185" text-anchor="middle" fill="#f59e0b">OBD-II J1962</text>
+  <text class="pin" x="105" y="200" text-anchor="middle">16-pin male plug</text>
+  <text class="pin" x="30" y="232" fill="#f59e0b">Pin 6  · CAN High</text>
+  <text class="pin" x="30" y="272" fill="#3b82f6">Pin 14 · CAN Low</text>
+  <text class="pin" x="30" y="342" fill="#cbd5e1">Pin 4/5 · Signal GND</text>
+  <text class="pin" x="30" y="382" fill="#64748b">Pin 16 · +12V UNUSED</text>
+  <circle cx="190" cy="228" r="4.5" fill="#f59e0b"/>
+  <circle cx="190" cy="268" r="4.5" fill="#3b82f6"/>
+  <circle cx="190" cy="338" r="4.5" fill="#cbd5e1"/>
+  <circle cx="190" cy="378" r="4.5" fill="#64748b"/>
+  <text class="note" x="105" y="404" text-anchor="middle" fill="#64748b">battery build draws</text>
+  <text class="note" x="105" y="417" text-anchor="middle" fill="#64748b">no power from the car</text>
+
+  <!-- ---------------- MS309-3 DONOR BOARD ---------------- -->
+  <rect class="comp" x="250" y="80" width="310" height="440" stroke="#22d3ee"/>
+  <text class="lbl" x="405" y="104" text-anchor="middle" fill="#22d3ee">MS309-3 V:1.5 (donor board)</text>
+
+  <!-- dead scanner MCU -->
+  <rect x="370" y="116" width="90" height="46" fill="#0f172a" stroke="#475569"/>
+  <text class="pin" x="415" y="135" text-anchor="middle" fill="#64748b">old scanner</text>
+  <text class="pin" x="415" y="150" text-anchor="middle" fill="#64748b">MCU (dead)</text>
+
+  <!-- jumper channel -->
+  <rect x="256" y="186" width="26" height="414" fill="none" stroke="#475569" stroke-dasharray="4,4"/>
+  <text class="note" x="269" y="178" text-anchor="middle" fill="#64748b">JUMPER</text>
+  <text class="note" x="269" y="190" text-anchor="middle" fill="#64748b">CH</text>
+
+  <!-- CAN transceiver -->
+  <rect x="330" y="205" width="150" height="195" fill="#0f172a" stroke="#22d3ee"/>
+  <text class="lbl" x="405" y="224" text-anchor="middle" fill="#22d3ee">CAN transceiver</text>
+  <text class="note" x="405" y="237" text-anchor="middle" fill="#64748b">8-pin · 3.3V family</text>
+  <circle cx="338" cy="212" r="2.5" fill="#e5e7eb"/>
+  <!-- left pins (labels inside the package, wires exit left) -->
+  <text class="pin" x="338" y="266">1 TXD</text>
+  <text class="pin" x="338" y="306">2 GND</text>
+  <text class="pin" x="338" y="346">3 VCC</text>
+  <text class="pin" x="338" y="386">4 RXD</text>
+  <circle cx="330" cy="258" r="4" fill="#10b981"/>
+  <circle cx="330" cy="298" r="4" fill="#cbd5e1"/>
+  <circle cx="330" cy="338" r="4" fill="#f97316"/>
+  <circle cx="330" cy="378" r="4" fill="#a78bfa"/>
+  <!-- right pins (labels inside, wires exit right) -->
+  <text class="pin" x="474" y="250" text-anchor="end">8 RS → GND</text>
+  <text class="pin" x="474" y="294" text-anchor="end">7 CANH</text>
+  <text class="pin" x="474" y="334" text-anchor="end">6 CANL</text>
+  <text class="pin" x="474" y="374" text-anchor="end">5 VREF</text>
+  <circle cx="480" cy="258" r="4" fill="#cbd5e1"/>
+  <circle cx="480" cy="298" r="4" fill="#f59e0b"/>
+  <circle cx="480" cy="338" r="4" fill="#3b82f6"/>
+  <circle cx="480" cy="378" r="4" fill="#94a3b8"/>
+
+  <!-- dead regulator -->
+  <rect x="360" y="440" width="120" height="46" fill="#0f172a" stroke="#475569" stroke-dasharray="4,3"/>
+  <text class="pin" x="420" y="460" text-anchor="middle" fill="#64748b">AMS1117 3.3</text>
+  <text class="pin" x="420" y="476" text-anchor="middle" fill="#64748b">DEAD (no +12V)</text>
+
+  <!-- CUT #1 : TXD trace to old MCU -->
+  <line x1="400" y1="162" x2="358" y2="188" stroke="#64748b" stroke-dasharray="4,3"/>
+  <g class="cutx">
+    <line x1="368" y1="170" x2="384" y2="186"/>
+    <line x1="384" y1="170" x2="368" y2="186"/>
+  </g>
+  <text class="note" x="392" y="180" fill="#f87171">✂ CUT #1 · TXD trace to old MCU</text>
+
+  <!-- CUT #2 : VCC trace to AMS1117 -->
+  <line x1="400" y1="400" x2="400" y2="440" stroke="#64748b" stroke-dasharray="4,3"/>
+  <g class="cutx">
+    <line x1="392" y1="410" x2="408" y2="426"/>
+    <line x1="408" y1="410" x2="392" y2="426"/>
+  </g>
+  <text class="note" x="414" y="412" fill="#f87171">✂ CUT #2 · VCC trace to AMS1117</text>
+
+  <!-- ---------------- ESP32 ---------------- -->
+  <rect class="comp" x="650" y="80" width="185" height="440" stroke="#10b981"/>
+  <text class="lbl" x="742" y="104" text-anchor="middle" fill="#10b981">ESP32 DevKit</text>
+  <text class="pin" x="742" y="119" text-anchor="middle">TWAI CAN @ 500 kbps</text>
+  <text class="pin" x="656" y="250">GPIO5 · TX</text>
+  <text class="pin" x="656" y="288">GPIO4 · RX</text>
+  <circle cx="650" cy="258" r="4" fill="#10b981"/>
+  <circle cx="650" cy="296" r="4" fill="#a78bfa"/>
+  <text class="pin" x="829" y="158" text-anchor="end">GPIO15 · CS</text>
+  <text class="pin" x="829" y="193" text-anchor="end">GPIO2 · DC</text>
+  <text class="pin" x="829" y="228" text-anchor="end">GPIO16 · RST</text>
+  <text class="pin" x="829" y="263" text-anchor="end">GPIO18 · SCK</text>
+  <text class="pin" x="829" y="298" text-anchor="end">GPIO23 · MOSI</text>
+  <text class="pin" x="829" y="348" text-anchor="end">3V3 out</text>
+  <text class="pin" x="829" y="388" text-anchor="end">GPIO34 · ADC1</text>
+  <text class="note" x="829" y="401" text-anchor="end" fill="#64748b">→ sheet 2 divider</text>
+  <circle cx="835" cy="154" r="4" fill="#a78bfa"/>
+  <circle cx="835" cy="189" r="4" fill="#a78bfa"/>
+  <circle cx="835" cy="224" r="4" fill="#a78bfa"/>
+  <circle cx="835" cy="259" r="4" fill="#a78bfa"/>
+  <circle cx="835" cy="294" r="4" fill="#a78bfa"/>
+  <circle cx="835" cy="344" r="4" fill="#f97316"/>
+  <circle cx="835" cy="384" r="4" fill="#fbbf24"/>
+  <circle cx="742" cy="520" r="4" fill="#cbd5e1"/>
+  <text class="pin" x="742" y="512" text-anchor="middle">GND</text>
+
+  <!-- ---------------- TFT ST7735 ---------------- -->
+  <rect class="comp" x="930" y="110" width="140" height="320" stroke="#a78bfa"/>
+  <text class="lbl" x="1000" y="134" text-anchor="middle" fill="#a78bfa">ST7735 1.8"</text>
+  <text class="pin" x="1000" y="149" text-anchor="middle">128×160 carousel UI</text>
+  <text class="pin" x="938" y="176">CS</text>
+  <text class="pin" x="938" y="211">DC</text>
+  <text class="pin" x="938" y="246">RST</text>
+  <text class="pin" x="938" y="281">SCK</text>
+  <text class="pin" x="938" y="316">MOSI</text>
+  <text class="pin" x="938" y="356">VCC</text>
+  <text class="pin" x="938" y="391">GND</text>
+  <circle cx="930" cy="172" r="4" fill="#a78bfa"/>
+  <circle cx="930" cy="207" r="4" fill="#a78bfa"/>
+  <circle cx="930" cy="242" r="4" fill="#a78bfa"/>
+  <circle cx="930" cy="277" r="4" fill="#a78bfa"/>
+  <circle cx="930" cy="312" r="4" fill="#a78bfa"/>
+  <circle cx="930" cy="352" r="4" fill="#f97316"/>
+  <circle cx="930" cy="387" r="4" fill="#cbd5e1"/>
+  <text class="note" x="1000" y="412" text-anchor="middle" fill="#94a3b8">BLK via 100Ω to 3V3</text>
+
+  <!-- ---------------- WIRES ---------------- -->
+  <!-- CAN High : OBD pin6 -> transceiver pin7 -->
+  <path class="wire" d="M190 228 V52 H600 V298 H484" stroke="#f59e0b"/>
+  <text class="note" x="200" y="44" fill="#f59e0b">CAN-H (orange harness) → transceiver pin 7</text>
+  <!-- CAN Low : OBD pin14 -> transceiver pin6 -->
+  <path class="wire" d="M190 268 V72 H620 V338 H484" stroke="#3b82f6"/>
+  <text class="note" x="200" y="64" fill="#3b82f6">CAN-L (yellow harness) → transceiver pin 6</text>
+
+  <!-- TXD : pin1 -> GPIO5 -->
+  <path class="wire" d="M330 258 H300 V555 H610 V258 H650" stroke="#10b981"/>
+  <text class="note" x="340" y="547" fill="#10b981">TXD (pin 1) → GPIO5</text>
+  <!-- RXD : pin4 -> GPIO4 -->
+  <path class="wire" d="M330 378 H318 V590 H628 V296 H650" stroke="#a78bfa"/>
+  <text class="note" x="340" y="582" fill="#a78bfa">RXD (pin 4) → GPIO4</text>
+
+  <!-- RS pin8 -> ground bus -->
+  <path class="wire" d="M480 258 H566 V640" stroke="#cbd5e1" stroke-dasharray="6,3"/>
+  <!-- VCC pin3 -> ESP32 3V3 -->
+  <path class="wire" d="M330 338 H306 V28 H860 V344 H839" stroke="#f97316"/>
+  <text class="note" x="600" y="20" fill="#f97316">ESP32 3V3 → transceiver pin 3 (VCC)</text>
+
+  <!-- chip GND pin2 -> bus -->
+  <path class="wire" d="M330 298 H282 V640" stroke="#cbd5e1" stroke-dasharray="6,3"/>
+  <!-- OBD GND -> bus -->
+  <path class="wire" d="M190 338 H232 V640" stroke="#cbd5e1" stroke-dasharray="6,3"/>
+  <!-- ESP32 GND -> bus -->
+  <path class="wire" d="M742 520 V640" stroke="#cbd5e1" stroke-dasharray="6,3"/>
+  <!-- TFT GND -> bus -->
+  <path class="wire" d="M930 387 H900 V640" stroke="#cbd5e1" stroke-dasharray="6,3"/>
+
+  <!-- SPI bus ESP32 -> TFT -->
+  <path class="wire" d="M835 154 L930 172" stroke="#a78bfa"/>
+  <path class="wire" d="M835 189 L930 207" stroke="#a78bfa"/>
+  <path class="wire" d="M835 224 L930 242" stroke="#a78bfa"/>
+  <path class="wire" d="M835 259 L930 277" stroke="#a78bfa"/>
+  <path class="wire" d="M835 294 L930 312" stroke="#a78bfa"/>
+  <text class="note" x="845" y="146" fill="#a78bfa">SPI</text>
+  <!-- 3V3 -> TFT VCC -->
+  <path class="wire" d="M835 344 H880 V352 H926" stroke="#f97316"/>
+
+  <!-- ---------------- GND BUS ---------------- -->
+  <line class="wire" x1="40" y1="640" x2="1060" y2="640" stroke="#cbd5e1" stroke-width="3" stroke-dasharray="10,5"/>
+  <text class="pin" x="40" y="630" fill="#94a3b8">GND COMMON BUS — ESP32 GND · OBD pin 4/5 · transceiver pin 2 · RS pin 8 · TFT GND</text>
+  <line class="wire" x1="205" y1="640" x2="205" y2="658" stroke="#cbd5e1"/>
+  <line class="wire" x1="192" y1="658" x2="218" y2="658" stroke="#cbd5e1"/>
+  <line class="wire" x1="197" y1="664" x2="213" y2="664" stroke="#cbd5e1"/>
+  <line class="wire" x1="202" y1="670" x2="208" y2="670" stroke="#cbd5e1"/>
+  <text class="note" x="215" y="672" fill="#94a3b8">common ground is mandatory — CAN has no ground reference</text>
+</svg>
