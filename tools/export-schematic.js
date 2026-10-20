@@ -31,7 +31,7 @@ svgs.forEach((s, i) => {
     .replace(/<svg viewBox="([^"]+)"/, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="$1" width="${vw}" height="${vh}"`)
     .replace(/(<svg[^>]*>)/, `$1\n<style>${css}\ntext{font-family:ui-monospace,Consolas,monospace}</style>`);
   fs.writeFileSync(path.join(OUT, `${names[i]}.svg`), standalone, 'utf8');
-  console.log(`sheet ${i + 1}: ${vw}x${vh} -> docs/schematic/${names[i]}.svg`);
+  console.log(`sheet ${i + 1}: ${vw}x${vh} -> images/${names[i]}.svg`);
 });
 
 /* -------------------------------------------------------------------- audit */
@@ -155,12 +155,14 @@ svgs.forEach((s, i) => {
   render(wrap, path.join(OUT, `${names[i]}@3x.png`), vw, vh, 3);
   fs.unlinkSync(wrap);
 });
-render(SRC, path.join(OUT, 'wiring-schematic-battery@2x.png'), 1220, 2500, 2);
+render(SRC, path.join(OUT, 'schematic-full@2x.png'), 1220, 2500, 2);
 
 function pngSize(p) {
   const b = fs.readFileSync(p);
   return `${b.readUInt32BE(16)} x ${b.readUInt32BE(20)} px`;
 }
-console.log('\n--- OUTPUT ---');
-[...svgs.map((_, i) => path.join(OUT, `${names[i]}@3x.png`)), path.join(OUT, 'wiring-schematic-battery@2x.png')]
+console.log('\n--- OUTPUT (images/) ---');
+[...svgs.map((_, i) => path.join(OUT, `${names[i]}@3x.png`)), path.join(OUT, 'schematic-full@2x.png')]
   .forEach(p => console.log(`  ${path.basename(p).padEnd(40)} ${pngSize(p)}  ${(fs.statSync(p).size / 1024).toFixed(0)} KB`));
+[...svgs.map((_, i) => path.join(OUT, `${names[i]}.svg`))]
+  .forEach(p => console.log(`  ${path.basename(p).padEnd(40)} vector SVG  ${(fs.statSync(p).size / 1024).toFixed(0)} KB`));

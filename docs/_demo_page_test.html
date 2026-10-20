@@ -1,0 +1,66 @@
+
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kolls Autotronics - Live Node</title>
+<style>
+ body{margin:0;background:#0b1220;color:#e5e7eb;font-family:system-ui,-apple-system,sans-serif;padding:16px}
+ h1{font-size:15px;color:#22d3ee;margin:0 0 2px;letter-spacing:.5px}
+ .sub{color:#64748b;font-size:11px;margin-bottom:14px}
+ .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+ .card{background:#162033;border:1px solid #334155;border-radius:14px;padding:14px}
+ .lbl{font-size:10px;letter-spacing:1px;color:#94a3b8;text-transform:uppercase}
+ .val{font-size:30px;font-weight:700;margin-top:4px;line-height:1}
+ .unit{font-size:13px;color:#94a3b8;margin-left:3px;font-weight:400}
+ .g{color:#4ade80}.y{color:#fbbf24}.r{color:#f87171}.c{color:#22d3ee}
+ .bar{height:6px;background:#1e293b;border-radius:4px;margin-top:10px;overflow:hidden}
+ .fill{height:100%;border-radius:4px;transition:width .4s}
+ footer{margin-top:14px;font-size:10px;color:#475569;display:flex;gap:14px;flex-wrap:wrap}
+ #st{position:fixed;top:10px;right:12px;font-size:10px;color:#64748b}
+</style></head><body>
+<div id="st">connecting…</div>
+<h1>⚡ KOLLS AUTOTRONICS — LIVE NODE</h1>
+<div class="sub" id="hd">Kolls Autotronics Test Vehicle</div>
+<div class="grid">
+ <div class="card"><div class="lbl">Engine speed</div><div class="val" id="rpm">—<span class="unit">rpm</span></div>
+  <div class="bar"><div class="fill c" id="rpmf" style="width:0%"></div></div></div>
+ <div class="card"><div class="lbl">Coolant</div><div class="val" id="ct">—<span class="unit">°C</span></div>
+  <div class="bar"><div class="fill g" id="ctf" style="width:0%"></div></div></div>
+ <div class="card"><div class="lbl">System voltage</div><div class="val" id="bv">—<span class="unit">V</span></div>
+  <div class="bar"><div class="fill g" id="bvf" style="width:0%"></div></div></div>
+ <div class="card"><div class="lbl">Engine load</div><div class="val" id="ld">—<span class="unit">%</span></div>
+  <div class="bar"><div class="fill c" id="ldf" style="width:0%"></div></div></div>
+ <div class="card"><div class="lbl">Health score</div><div class="val g" id="sc">—<span class="unit">/100</span></div>
+  <div class="bar"><div class="fill g" id="scf" style="width:0%"></div></div></div>
+ <div class="card"><div class="lbl">Gateway pack</div><div class="val" id="dv">—<span class="unit">%</span></div>
+  <div class="bar"><div class="fill g" id="dvf" style="width:0%"></div></div></div>
+</div>
+<footer><span id="f1"></span><span id="f2"></span><span id="f3"></span></footer>
+<script>window.fetch=async()=>({json:async()=>JSON.parse("{\"vehicle_id\":\"KA-TRUCK-001\",\"name\":\"Kolls Autotronics Test Vehicle\",\"live\":true,\"score\":87,\"battery\":\"13.82\",\"coolant\":\"88.4\",\"oil_temp\":\"95.2\",\"rpm\":2450,\"fuel\":62,\"range\":372,\"odometer_km\":128430,\"systems\":{\"engine\":95,\"cooling\":88,\"electrical\":97,\"brakes\":84},\"status\":\"NOMINAL\",\"severity\":0,\"tone\":\"good\",\"gateway\":{\"device_v\":\"3.87\",\"device_pct\":66,\"obd_detached\":false,\"disconnect_count\":0,\"can_feed\":\"HARDWARE_CAN\",\"ip\":\"192.168.43.123\",\"wifi_rssi\":-58,\"uptime_sec\":3812,\"fw_version\":\"2.2-direct\",\"tires_available\":false}}")});</script><script>
+const q=id=>document.getElementById(id);
+function set(id,v,cls){const e=q(id);e.className='val '+(cls||'');e.innerHTML=v;}
+async function tick(){
+ try{
+  const d=await (await fetch('/telemetry',{cache:'no-store'})).json();
+  const n=v=>v===null||v===undefined?'—':v;
+  set('rpm',n(d.rpm)+'<span class="unit">rpm</span>',d.rpm>4500?'r':d.rpm>3000?'y':'');
+  q('rpmf').style.width=Math.min(100,d.rpm/6000*100)+'%';
+  q('rpmf').style.background=d.rpm>4500?'#f87171':d.rpm>3000?'#fbbf24':'#22d3ee';
+  set('ct',n(d.coolant)+'<span class="unit">°C</span>',+d.coolant>=100?'r':+d.coolant>=90?'y':'g');
+  q('ctf').style.width=Math.min(100,Math.max(0,(d.coolant-60)/60*100))+'%';
+  set('bv',n(d.battery)+'<span class="unit">V</span>',+d.battery<11.8?'r':+d.battery<=12.4?'y':'g');
+  q('bvf').style.width=Math.min(100,Math.max(0,(d.battery-11)/4*100))+'%';
+  set('ld',n(d.load_pct||0)+'<span class="unit">%</span>','');
+  q('ldf').style.width=(d.load_pct||0)+'%';
+  set('sc',n(d.score),d.score>=80?'g':d.score>=60?'y':'r');
+  q('scf').style.width=n(d.score)+'%';
+  set('dv',(d.gateway?d.gateway.device_pct:'—')+'<span class="unit">%</span>',d.gateway&&d.gateway.device_pct<20?'r':'');
+  q('dvf').style.width=(d.gateway?d.gateway.device_pct:0)+'%';
+  q('hd').textContent=(d.name||'')+' · '+(d.vehicle_id||'');
+  q('f1').textContent='FEED: '+(d.gateway?d.gateway.can_feed:'—');
+  q('f2').textContent='STATUS: '+(d.status||'—');
+  q('f3').textContent='OBD: '+(d.gateway&&d.gateway.obd_detached?'DETACHED':'connected');
+  q('st').textContent='live · '+(d.gateway?d.gateway.ip:'');
+ }catch(e){q('st').textContent='device offline'}
+}
+tick();setInterval(tick,1000);
+</script></body></html>

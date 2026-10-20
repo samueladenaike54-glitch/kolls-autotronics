@@ -45,6 +45,8 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
 #include "driver/twai.h"
 
 #define USE_TFT 1                 // Set 0 for a bare telemetry node (no display attached)
@@ -165,6 +167,7 @@ struct DeviceState {
 // ==============================================================================================
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
+WebServer  httpServer(80);      // direct-connect demo server (defined early: used in loop())
 
 #if USE_TFT
   Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
@@ -232,6 +235,8 @@ bool connectMQTT();
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void publishTelemetry();
 void publishAppPayload();
+size_t buildAppJson(char* out, size_t outLen);
+void startHttpServer();
 void printTelemetrySerial();
 #if USE_TFT
   void displayBootScreen();
@@ -273,6 +278,9 @@ void setup() {
   mqttClient.setBufferSize(640);
 
   initCANBus();
+
+  // Direct-connect HTTP server (demo path: device-hosted dashboard + JSON API)
+  startHttpServer();
 
   randomSeed(esp_random());
 
@@ -377,8 +385,7 @@ void loop() {
     if (mqttConnected) {
       publishTelemetry();
       publishAppPayload();
-    }
-    printTelemetrySerial();
+    }    printTelemetrySerial();
 #if USE_TFT
     uiTick(now);
 #endif
@@ -392,6 +399,9 @@ void loop() {
     drawFooter(true);
   }
 #endif
+
+  // 11. Direct-connect HTTP server (demo path - serves the dashboard + JSON API)
+  httpServer.handleClient();
 
   yield();
 }
@@ -761,6 +771,14 @@ void connectWiFi() {
     wifiConnected = true;
     Serial.println(F(" CONNECTED!"));
     Serial.printf("[WiFi] IP: %s | RSSI: %d dBm\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+
+    // Direct-connect: mDNS alias + local web server (no broker required)
+    if (MDNS.begin("kolls-gw")) {
+      MDNS.addService("http", "tcp", 80);
+      Serial.println(F("[WiFi] mDNS: http://kolls-gw.local"));
+    }
+    Serial.printf("[DEMO] Open on your laptop:  http://%s/   (or http://kolls-gw.local/)\n",
+                  WiFi.localIP().toString().c_str());
   } else {
     wifiConnected = false;
     Serial.println(F(" TIMEOUT -> standalone offline mode"));
@@ -878,14 +896,11 @@ void publishTelemetry() {
 //                    APP-SHAPED PAYLOAD (mirrors the web app data model)
 // ==============================================================================================
 /**
+ * Builds the app-shaped JSON document (shared by the MQTT topic and the HTTP endpoint).
  * The web dashboard's vehicle object uses flat, consumer-facing field names:
- *   battery, coolant, range, fuel, tires[], systems{engine,cooling,electrical,brakes}, score
- * This payload publishes exactly those names (real values, derived where no PID exists)
- * on its own topic so the app can bind to it without any translation layer.
- *
- * Topic: kolls/vehicle/{VEHICLE_ID}/app
+ *   battery, coolant, range, fuel, systems{engine,cooling,electrical,brakes}, score
  */
-void publishAppPayload() {
+size_t buildAppJson(char* out, size_t outLen) {
 #if ARDUINOJSON_VERSION_MAJOR >= 7
   JsonDocument doc;
 #else
@@ -946,14 +961,154 @@ void publishAppPayload() {
   gw["obd_detached"]    = device.obd_detached;
   gw["disconnect_count"] = device.disconnect_count;
   gw["can_feed"]        = telemetry.using_sim_data ? "SIMULATED" : "HARDWARE_CAN";
-  gw["fw_version"]      = "2.1-battery";
+  gw["fw_version"]      = "2.2-direct";
   gw["tires_available"] = false;   // no TPMS PID - app should keep its own tyre data
+  gw["ip"]              = WiFi.localIP().toString();
+  gw["wifi_rssi"]       = WiFi.RSSI();
+  gw["uptime_sec"]      = millis() / 1000;
 
+  return serializeJson(doc, out, outLen);
+}
+
+void publishAppPayload() {
   char jsonBuffer[768];
-  size_t bytesWritten = serializeJson(doc, jsonBuffer, sizeof(jsonBuffer));
+  size_t bytesWritten = buildAppJson(jsonBuffer, sizeof(jsonBuffer));
   if (!mqttClient.publish(mqttAppTopic, jsonBuffer, bytesWritten)) {
     Serial.println(F("[MQTT] WARNING: app-shape publish failed!"));
   }
+}
+
+// ==============================================================================================
+//                       DIRECT-CONNECT HTTP SERVER (demo path - no broker needed)
+// ==============================================================================================
+/**
+ * The device serves its own telemetry over plain HTTP so the demo works with
+ * ZERO cloud dependencies (no broker, no internet, no registration):
+ *
+ *   http://<esp-ip>/            -> live dashboard served BY the device
+ *   http://<esp-ip>/telemetry   -> the same app-shaped JSON (CORS enabled)
+ *   http://<esp-ip>/health      -> device health / identity blob
+ *   http://kolls-gw.local/...   -> mDNS alias of the same
+ */
+void handleRoot();
+void handleTelemetry();
+void handleHealth();
+void sendCORS();
+
+void sendCORS() {
+  httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+  httpServer.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  httpServer.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+  httpServer.sendHeader("Cache-Control", "no-store");
+}
+
+void handleTelemetry() {
+  char buf[768];
+  buildAppJson(buf, sizeof(buf));
+  sendCORS();
+  httpServer.send(200, "application/json", String(buf));
+}
+
+void handleHealth() {
+  char buf[320];
+  snprintf(buf, sizeof(buf),
+           "{\"device\":\"%s\",\"ip\":\"%s\",\"rssi\":%d,\"uptime_sec\":%lu,"
+           "\"heap\":%u,\"can_feed\":\"%s\",\"status\":\"%s\",\"severity\":%u,"
+           "\"obd_detached\":%s,\"disconnect_count\":%u,\"device_v\":%.2f,\"device_pct\":%u}",
+           VEHICLE_ID, WiFi.localIP().toString().c_str(), WiFi.RSSI(),
+           (unsigned long)(millis() / 1000), ESP.getFreeHeap(),
+           telemetry.using_sim_data ? "SIMULATED" : "HARDWARE_CAN",
+           telemetry.status.c_str(), telemetry.severity,
+           device.obd_detached ? "true" : "false", device.disconnect_count,
+           device.device_v, device.device_pct);
+  sendCORS();
+  httpServer.send(200, "application/json", buf);
+}
+
+void handleRoot() {
+  // Self-contained live dashboard - works with no internet, no broker, no app.
+  static const char PAGE[] PROGMEM = R"HTML(
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kolls Autotronics - Live Node</title>
+<style>
+ body{margin:0;background:#0b1220;color:#e5e7eb;font-family:system-ui,-apple-system,sans-serif;padding:16px}
+ h1{font-size:15px;color:#22d3ee;margin:0 0 2px;letter-spacing:.5px}
+ .sub{color:#64748b;font-size:11px;margin-bottom:14px}
+ .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+ .card{background:#162033;border:1px solid #334155;border-radius:14px;padding:14px}
+ .lbl{font-size:10px;letter-spacing:1px;color:#94a3b8;text-transform:uppercase}
+ .val{font-size:30px;font-weight:700;margin-top:4px;line-height:1}
+ .unit{font-size:13px;color:#94a3b8;margin-left:3px;font-weight:400}
+ .g{color:#4ade80}.y{color:#fbbf24}.r{color:#f87171}.c{color:#22d3ee}
+ .bar{height:6px;background:#1e293b;border-radius:4px;margin-top:10px;overflow:hidden}
+ .fill{height:100%;border-radius:4px;transition:width .4s}
+ footer{margin-top:14px;font-size:10px;color:#475569;display:flex;gap:14px;flex-wrap:wrap}
+ #st{position:fixed;top:10px;right:12px;font-size:10px;color:#64748b}
+</style></head><body>
+<div id="st">connecting…</div>
+<h1>⚡ KOLLS AUTOTRONICS — LIVE NODE</h1>
+<div class="sub" id="hd">Kolls Autotronics Test Vehicle</div>
+<div class="grid">
+ <div class="card"><div class="lbl">Engine speed</div><div class="val" id="rpm">—<span class="unit">rpm</span></div>
+  <div class="bar"><div class="fill c" id="rpmf" style="width:0%"></div></div></div>
+ <div class="card"><div class="lbl">Coolant</div><div class="val" id="ct">—<span class="unit">°C</span></div>
+  <div class="bar"><div class="fill g" id="ctf" style="width:0%"></div></div></div>
+ <div class="card"><div class="lbl">System voltage</div><div class="val" id="bv">—<span class="unit">V</span></div>
+  <div class="bar"><div class="fill g" id="bvf" style="width:0%"></div></div></div>
+ <div class="card"><div class="lbl">Engine load</div><div class="val" id="ld">—<span class="unit">%</span></div>
+  <div class="bar"><div class="fill c" id="ldf" style="width:0%"></div></div></div>
+ <div class="card"><div class="lbl">Health score</div><div class="val g" id="sc">—<span class="unit">/100</span></div>
+  <div class="bar"><div class="fill g" id="scf" style="width:0%"></div></div></div>
+ <div class="card"><div class="lbl">Gateway pack</div><div class="val" id="dv">—<span class="unit">%</span></div>
+  <div class="bar"><div class="fill g" id="dvf" style="width:0%"></div></div></div>
+</div>
+<footer><span id="f1"></span><span id="f2"></span><span id="f3"></span><span id="low"></span></footer>
+<script>
+const q=id=>document.getElementById(id);
+function set(id,v,cls){const e=q(id);e.className='val '+(cls||'');e.innerHTML=v;}
+async function tick(){
+ try{
+  const d=await (await fetch('/telemetry',{cache:'no-store'})).json();
+  const n=v=>v===null||v===undefined?'—':v;
+  set('rpm',n(d.rpm)+'<span class="unit">rpm</span>',d.rpm>4500?'r':d.rpm>3000?'y':'');
+  q('rpmf').style.width=Math.min(100,d.rpm/6000*100)+'%';
+  q('rpmf').style.background=d.rpm>4500?'#f87171':d.rpm>3000?'#fbbf24':'#22d3ee';
+  set('ct',n(d.coolant)+'<span class="unit">°C</span>',+d.coolant>=100?'r':+d.coolant>=90?'y':'g');
+  q('ctf').style.width=Math.min(100,Math.max(0,(d.coolant-60)/60*100))+'%';
+  set('bv',n(d.battery)+'<span class="unit">V</span>',+d.battery<11.8?'r':+d.battery<=12.4?'y':'g');
+  q('bvf').style.width=Math.min(100,Math.max(0,(d.battery-11)/4*100))+'%';
+  set('ld',n(d.load_pct||0)+'<span class="unit">%</span>','');
+  q('ldf').style.width=(d.load_pct||0)+'%';
+  set('sc',n(d.score),d.score>=80?'g':d.score>=60?'y':'r');
+  q('scf').style.width=n(d.score)+'%';
+  set('dv',(d.gateway?d.gateway.device_pct:'—')+'<span class="unit">%</span>',d.gateway&&d.gateway.device_pct<20?'r':'');
+  q('dvf').style.width=(d.gateway?d.gateway.device_pct:0)+'%';
+  q('dvf').style.background=(d.gateway&&d.gateway.device_pct<20)?'#f87171':'#4ade80';
+  const low=d.gateway&&d.gateway.device_pct<20;
+  q('low').textContent=low?'⚠ LOW BATTERY — CHARGE THE GATEWAY':'';
+  q('low').style.color='#f87171';
+  q('hd').textContent=(d.name||'')+' · '+(d.vehicle_id||'');
+  q('f1').textContent='FEED: '+(d.gateway?d.gateway.can_feed:'—');
+  q('f2').textContent='STATUS: '+(d.status||'—');
+  q('f3').textContent='OBD: '+(d.gateway&&d.gateway.obd_detached?'DETACHED':'connected');
+  q('st').textContent='live · '+(d.gateway?d.gateway.ip:'');
+ }catch(e){q('st').textContent='device offline'}
+}
+tick();setInterval(tick,1000);
+</script></body></html>
+)HTML";
+  sendCORS();
+  httpServer.send_P(200, "text/html", PAGE);
+}
+
+void startHttpServer() {
+  httpServer.on("/", HTTP_GET, handleRoot);
+  httpServer.on("/telemetry", HTTP_GET, handleTelemetry);
+  httpServer.on("/health", HTTP_GET, handleHealth);
+  httpServer.onNotFound(handleHealth);
+  httpServer.begin();
+  Serial.println(F("[HTTP] Direct-connect server started on port 80."));
 }
 
 // ==============================================================================================
@@ -1034,7 +1189,7 @@ void displayBootScreen() {
 
 const unsigned long UI_HOLD_MS    = 2600;   // ms a page rests before scrolling on
 const unsigned long UI_GLIDE_MS   = 700;    // ms scroll animation duration
-const uint8_t       UI_PAGE_COUNT = 3;      // pages in the endless cycle
+const uint8_t       UI_PAGE_COUNT = 4;      // pages in the endless cycle
 
 GFXcanvas16* pageCanvas = NULL;    // page currently displayed
 GFXcanvas16* nextCanvas = NULL;    // page being scrolled into
@@ -1097,7 +1252,7 @@ void uiTitle(Adafruit_GFX& g, const char* title, uint8_t pageIdx) {
 
   // carousel position dots
   for (uint8_t i = 0; i < UI_PAGE_COUNT; i++) {
-    int16_t x = 98 + (int16_t)i * 9;
+    int16_t x = 116 - (int16_t)(UI_PAGE_COUNT - 1 - i) * 9;
     if (i == pageIdx) g.fillCircle(x, 10, 2, COLOR_CYAN);
     else              g.drawCircle(x, 10, 2, COLOR_GRAY);
   }
@@ -1274,11 +1429,47 @@ void renderPage2(Adafruit_GFX& g) {
   uiValue(g, 124, 112, buf, 1, device.disconnect_count ? COLOR_RED : COLOR_GRAY);
 }
 
+// ------------------------------------- PAGE 3 : NETWORK / DEMO ACCESS (direct connect)
+void renderPage3(Adafruit_GFX& g) {
+  g.fillScreen(COLOR_BLACK);
+  uiTitle(g, "NET", 3);
+  char buf[20];
+
+  uiLabel(g, 4, 26, "IP ADDRESS");
+  snprintf(buf, sizeof(buf), "%s", WiFi.localIP().toString().c_str());
+  uiValue(g, 124, 26, buf, 1, COLOR_CYAN);
+  g.drawFastHLine(0, 40, 128, COLOR_DARK_GRAY);
+
+  uiLabel(g, 4, 46, "LOCAL URL");
+  uiValue(g, 124, 46, "kolls-gw.local", 1, COLOR_CYAN);
+  g.drawFastHLine(0, 60, 128, COLOR_DARK_GRAY);
+
+  uiLabel(g, 4, 66, "MQTT LINK");
+  uiValue(g, 124, 66, mqttConnected ? "ONLINE" : (wifiConnected ? "OFFLINE" : "NO WIFI"), 1,
+          mqttConnected ? COLOR_GREEN : COLOR_RED);
+  g.drawFastHLine(0, 80, 128, COLOR_DARK_GRAY);
+
+  uiLabel(g, 4, 86, "SIGNAL");
+  uiWifiIcon(g, 58, 84, (uint8_t)wifiBarsFor(WiFi.RSSI()));
+  snprintf(buf, sizeof(buf), "%d dB", WiFi.RSSI());
+  uiValue(g, 124, 86, buf, 1, COLOR_WHITE);
+  g.drawFastHLine(0, 100, 128, COLOR_DARK_GRAY);
+
+  uint32_t up = millis() / 1000;
+  snprintf(buf, sizeof(buf), "UP %02lu:%02lu:%02lu",
+           (unsigned long)((up / 3600) % 100), (unsigned long)((up / 60) % 60), (unsigned long)(up % 60));
+  uiLabel(g, 4, 106, buf);
+  snprintf(buf, sizeof(buf), "D %u", device.disconnect_count);
+  uiValue(g, 124, 106, buf, 1, device.disconnect_count ? COLOR_RED : COLOR_GRAY);
+  uiLabel(g, 4, 116, "v2.2 DIRECT");
+}
+
 void renderPage(uint8_t page, Adafruit_GFX& g) {
   switch (page % UI_PAGE_COUNT) {
     case 0:  renderPage0(g); break;
     case 1:  renderPage1(g); break;
-    default: renderPage2(g); break;
+    case 2:  renderPage2(g); break;
+    default: renderPage3(g); break;
   }
 }
 
