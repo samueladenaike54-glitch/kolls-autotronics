@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * KOLLS — SMART CAR HEALTH MONITOR APP LOGIC
- * Minimalistic, Consumer-Friendly Driver Cockpit (No Military Jargon or Maps)
+ * Dark Neumorphism (Soft UI) — Pure White & Dark Blue Automotive Cockpit
  * ==============================================================================
  */
 
@@ -100,13 +100,8 @@ function updateHealthScoreDisplay(newScore) {
   const barEl = document.getElementById('health-circle-bar');
   if (barEl) {
     barEl.setAttribute('stroke-dasharray', `${STATE.healthScore}, 100`);
-    if (STATE.healthScore >= 85) {
-      barEl.style.stroke = 'var(--accent-green)';
-    } else if (STATE.healthScore >= 70) {
-      barEl.style.stroke = 'var(--accent-yellow)';
-    } else {
-      barEl.style.stroke = 'var(--accent-red)';
-    }
+    barEl.style.stroke = 'var(--text-white)';
+    barEl.style.filter = 'drop-shadow(0 0 6px var(--accent-blue-glow))';
   }
 
   // Update Status Pill
@@ -115,15 +110,15 @@ function updateHealthScoreDisplay(newScore) {
   if (pillEl) {
     if (STATE.healthScore >= 90) {
       pillEl.className = 'status-pill status-good';
-      pillEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> Excellent Condition';
+      pillEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> Optimal Condition';
       if (summaryEl) summaryEl.innerText = 'All vehicle subsystems are operating at optimal factory performance.';
     } else if (STATE.healthScore >= 75) {
       pillEl.className = 'status-pill status-good';
-      pillEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> Great Condition';
-      if (summaryEl) summaryEl.innerText = 'No urgent breakdowns detected. One minor service recommended soon.';
+      pillEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> Nominal Condition';
+      if (summaryEl) summaryEl.innerText = 'No critical faults detected. One preventative maintenance item suggested soon.';
     } else {
       pillEl.className = 'status-pill status-warn';
-      pillEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Service Needed';
+      pillEl.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Inspection Recommended';
       if (summaryEl) summaryEl.innerText = 'Attention required: cooling or battery system requires driver inspection.';
     }
   }
@@ -148,17 +143,23 @@ function simulateRepair(alertId, savedDollars) {
   setTimeout(() => {
     alertCard.remove();
 
-    // If thermostat was fixed, also fix cooling row on Health screen
+    // If thermostat was fixed, also update cooling row on Health screen
     if (alertId === 1) {
       const coolingRow = document.getElementById('comp-row-cooling');
       if (coolingRow) {
         coolingRow.classList.remove('alert-row');
-        coolingRow.querySelector('.comp-info p').className = 'text-green';
-        coolingRow.querySelector('.comp-info p').innerText = 'Thermostat operating at peak efficiency';
-        coolingRow.querySelector('.comp-status strong').innerText = '96%';
-        coolingRow.querySelector('.comp-status strong').className = 'text-green';
-        coolingRow.querySelector('.comp-status span').innerText = 'Good';
-        coolingRow.querySelector('.comp-icon').className = 'comp-icon bg-green-light text-green';
+        const pDesc = coolingRow.querySelector('.comp-info p');
+        if (pDesc) {
+          pDesc.className = 'text-sub';
+          pDesc.innerText = 'Thermostat operating at peak nominal efficiency';
+        }
+        const stStrong = coolingRow.querySelector('.comp-status strong');
+        if (stStrong) {
+          stStrong.innerText = '96%';
+          stStrong.className = 'text-white';
+        }
+        const stSpan = coolingRow.querySelector('.comp-status span');
+        if (stSpan) stSpan.innerText = 'Optimal';
       }
     }
 
@@ -175,7 +176,7 @@ function simulateRepair(alertId, savedDollars) {
 }
 
 /**
- * Driving style toggle (Gentle / City / Heavy)
+ * Driving style toggle (Gentle Highway / Urban City / Stop & Go)
  */
 function setDriverStyle(style) {
   STATE.drivingStyle = style;
@@ -200,24 +201,14 @@ function renderWearBars() {
     const remainingKm = Math.round((c.baseKm - c.usedKm) * multiplier);
     const pct = Math.max(5, Math.min(100, Math.round((remainingKm / c.baseKm) * 100)));
 
-    let colorClass = 'text-green';
-    let fillClass = 'var(--accent-green)';
-    if (pct < 30) {
-      colorClass = 'text-red';
-      fillClass = 'var(--accent-red)';
-    } else if (pct < 50) {
-      colorClass = 'text-yellow';
-      fillClass = 'var(--accent-yellow)';
-    }
-
     return `
       <div class="wear-card">
         <div class="wear-head">
           <span>${c.title}</span>
-          <strong class="${colorClass}">${pct}% Life</strong>
+          <strong>${pct}% Life</strong>
         </div>
         <div class="wear-bar-track">
-          <div class="wear-bar-fill" style="width: ${pct}%; background-color: ${fillClass};"></div>
+          <div class="wear-bar-fill" style="width: ${pct}%;"></div>
         </div>
         <span class="wear-sub">${remainingKm.toLocaleString()} KM remaining before recommended change</span>
       </div>
@@ -261,7 +252,7 @@ function sendAssistantMessage() {
     const q = text.toLowerCase();
 
     if (q.includes('warm') || q.includes('hot') || q.includes('temp') || q.includes('thermostat')) {
-      reply = "💡 <strong>Engine Warmth:</strong> Your thermostat is like a water valve that lets coolant flow when the engine gets hot. Right now, it's opening a bit sluggishly.<br><br>It's safe to drive for now, but changing the $20 part soon prevents the engine from overheating and warping costly parts.";
+      reply = "💡 <strong>Engine Warmth:</strong> Your thermostat is like a home radiator valve. Right now it's opening slowly.<br><br>It's safe to drive for now, but changing the $20 part soon prevents the engine from overheating and warping costly cylinder heads.";
     } else if (q.includes('brake') || q.includes('pad')) {
       reply = "🛑 <strong>Brake Pads:</strong> Think of brake pads like shoe soles. Right now you have 2.7 mm left before the metal backing touches the rotor.<br><br>You have about 1,200 km of normal driving left. A $180 pad change today avoids gouging your metal rotors which would cost $650.";
     } else if (q.includes('battery') || q.includes('volt')) {
@@ -317,33 +308,27 @@ function triggerTestScenario(type) {
 
   if (type === 'overheat') {
     document.getElementById('val-temp').innerText = '112°C';
-    document.getElementById('val-temp').className = 'vital-value text-red';
     updateHealthScoreDisplay(68);
-    showToast("⚠️ Warning: Engine temp high (112°C). Thermostat valve sticking.");
+    showToast("⚠️ Warning: Elevated engine temperature (112°C). Thermostat valve sluggish.");
   } else if (type === 'battery') {
     document.getElementById('val-battery').innerText = '11.4 V';
-    document.getElementById('val-battery').className = 'vital-value text-yellow';
     updateHealthScoreDisplay(72);
-    showToast("⚠️ Notice: Low battery voltage detected (11.4V).");
+    showToast("⚠️ Notice: Low battery bus voltage detected (11.4V).");
   } else if (type === 'tire') {
     const tireFl = document.getElementById('tire-fl');
     if (tireFl) {
       tireFl.innerText = '24 PSI';
-      tireFl.className = 'tire-psi text-yellow';
     }
     showToast("⚠️ Notice: Front Left tire pressure dropped to 24 PSI.");
   } else if (type === 'reset') {
     document.getElementById('val-temp').innerText = '88°C';
-    document.getElementById('val-temp').className = 'vital-value';
     document.getElementById('val-battery').innerText = '13.8 V';
-    document.getElementById('val-battery').className = 'vital-value';
     const tireFl = document.getElementById('tire-fl');
     if (tireFl) {
       tireFl.innerText = '35 PSI';
-      tireFl.className = 'tire-psi text-green';
     }
     updateHealthScoreDisplay(87);
-    showToast("All vehicle systems restored to normal.");
+    showToast("All vehicle systems restored to nominal.");
   }
 }
 
@@ -372,8 +357,8 @@ function startSubtleSensorsDrift() {
       
       const tempEl = document.getElementById('val-temp');
       const voltEl = document.getElementById('val-battery');
-      if (tempEl && !tempEl.classList.contains('text-red')) tempEl.innerText = `${tempVariation}°C`;
-      if (voltEl && !voltEl.classList.contains('text-yellow')) voltEl.innerText = `${voltVariation} V`;
+      if (tempEl) tempEl.innerText = `${tempVariation}°C`;
+      if (voltEl) voltEl.innerText = `${voltVariation} V`;
     }
   }, 3000);
 }
