@@ -2795,6 +2795,10 @@ svg {
   gap: 8px;
 }
 
+.demo-fleet-link {
+  margin-top: 12px;
+}
+
 .demo-option {
   display: flex;
   align-items: center;
