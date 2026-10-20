@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <link rel="stylesheet" href="styles.css?v=13.2">
+  <link rel="stylesheet" href="styles.css?v=13.3">
 </head>
 <body>
   <svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
@@ -130,6 +130,10 @@
               </p>
             </div>
             <div class="page-head-actions">
+              <button class="btn btn-secondary btn-live" type="button" id="connect-esp32-btn" onclick="connectEsp32()" aria-label="Connect directly to the ESP32 gateway">
+                <span class="live-dot" aria-hidden="true"></span>
+                <span>ESP32 live</span>
+              </button>
               <button class="btn btn-secondary" type="button" id="scan-btn" onclick="runScan()" aria-label="Run a new vehicle scan">
                 <i class="fa-solid fa-rotate" aria-hidden="true"></i>
                 <span>Scan</span>
@@ -770,6 +774,14 @@
           </span>
           <span class="garage-score"><strong data-score-for="truck">74</strong><small>/ 100</small><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
         </button>
+
+        <button class="garage-item" type="button" data-car="live" id="garage-live" onclick="selectCar('live')" aria-pressed="false" hidden>
+          <span class="garage-car">
+            <span class="garage-icon"><i class="fa-solid fa-microchip" aria-hidden="true"></i></span>
+            <span class="garage-copy"><strong id="garage-live-name">ESP32 live vehicle</strong><small id="garage-live-meta">Direct gateway · waiting</small></span>
+          </span>
+          <span class="garage-score"><strong data-score-for="live">--</strong><small>/ 100</small><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
+        </button>
       </div>
     </div>
   </div>
@@ -884,8 +896,8 @@
   </div>
 
   <script src="mqtt.min.js?v=5.10.4"></script>
-  <script src="live-telemetry.js?v=1.1"></script>
+  <script src="live-telemetry.js?v=1.2"></script>
   <script src="ai-engine.js?v=1.1"></script>
-  <script src="app.js?v=12.2"></script>
+  <script src="app.js?v=12.3"></script>
 </body>
 </html>

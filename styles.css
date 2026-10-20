@@ -726,7 +726,28 @@ svg {
 }
 
 .page-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
   flex-shrink: 0;
+}
+
+.btn-live {
+  border-color: rgba(11, 122, 83, 0.28);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.btn-live:hover {
+  background: #dbefe4;
+  border-color: rgba(11, 122, 83, 0.44);
+}
+
+.btn-live .live-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(11, 122, 83, 0.12);
 }
 
 /* --------------------------------------------------------------------------
@@ -3336,6 +3357,22 @@ svg {
 
   .cert-sheet {
     padding: 22px;
+  }
+}
+
+@media (max-width: 639px) {
+  .page-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .page-head-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .page-head-actions .btn {
+    flex: 1;
   }
 }
 

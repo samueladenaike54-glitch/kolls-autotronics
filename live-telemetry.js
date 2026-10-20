@@ -9,6 +9,10 @@
   'use strict';
 
   const DEFAULT_BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+  const DEFAULT_GATEWAY = 'http://192.168.43.123';
+  const GATEWAY_STORAGE_KEY = 'orion.gatewayUrl';
+  const GATEWAY_POLL_MS = 1000;
+  const GATEWAY_TIMEOUT_MS = 2500;
   const RAW_TOPIC = 'kolls/vehicle/telemetry';
   const DEFAULT_VEHICLE_ID = 'KA-TRUCK-001';
   const APP_TOPIC_FORMAT = (vehicleId) => `kolls/vehicle/${vehicleId}/app`;
@@ -16,10 +20,34 @@
   const STALE_AFTER_MS = 9000;
   const WAITING_AFTER_MS = 10000;
 
+  function storedGateway() {
+    try {
+      const query = new URLSearchParams(global.location.search).get('gateway');
+      if (query) return normaliseGatewayUrl(query);
+      const saved = global.localStorage.getItem(GATEWAY_STORAGE_KEY);
+      return saved ? normaliseGatewayUrl(saved) : DEFAULT_GATEWAY;
+    } catch (error) {
+      return DEFAULT_GATEWAY;
+    }
+  }
+
+  function normaliseGatewayUrl(value) {
+    let url = String(value || '').trim();
+    if (!url) return '';
+    if (!/^https?:\/\//i.test(url)) url = `http://${url}`;
+    return url.replace(/\/+$/, '');
+  }
+
   const state = {
     status: 'idle',
+    mode: 'gateway',
     connected: false,
     brokerUrl: DEFAULT_BROKER,
+    gatewayUrl: storedGateway(),
+    gatewayConnected: false,
+    gatewayError: null,
+    lastGatewayAt: 0,
+    gatewayFailures: 0,
     topic: RAW_TOPIC,
     appTopic: APP_TOPIC_FORMAT(DEFAULT_VEHICLE_ID),
     vehicleId: DEFAULT_VEHICLE_ID,
@@ -39,6 +67,8 @@
   let client = null;
   let watchdog = null;
   let telemetryTimer = null;
+  let gatewayTimer = null;
+  let gatewayPolling = false;
   const listeners = new Set();
 
   function now() {
@@ -78,9 +108,15 @@
     const age = ageMs();
     return {
       status: state.status,
+      mode: state.mode,
       connected: state.connected,
       fresh: isFresh(),
       brokerUrl: state.brokerUrl,
+      gatewayUrl: state.gatewayUrl,
+      gatewayConnected: state.gatewayConnected,
+      gatewayError: state.gatewayError,
+      gatewayFailures: state.gatewayFailures,
+      lastGatewayAt: state.lastGatewayAt,
       topic: state.topic,
       appTopic: state.appTopic,
       vehicleId: state.vehicleId,
@@ -377,8 +413,129 @@
     }
   }
 
+  function gatewayUrl() {
+    return state.gatewayUrl;
+  }
+
+  function setGateway(url) {
+    const next = normaliseGatewayUrl(url);
+    if (!next) return false;
+
+    state.gatewayUrl = next;
+    try {
+      global.localStorage.setItem(GATEWAY_STORAGE_KEY, next);
+    } catch (error) {
+      /* storage can be unavailable on file:// pages */
+    }
+
+    if (gatewayTimer) {
+      stopGateway();
+      startGateway();
+    }
+
+    return true;
+  }
+
+  function stopGateway() {
+    if (gatewayTimer) {
+      global.clearInterval(gatewayTimer);
+      gatewayTimer = null;
+    }
+    gatewayPolling = false;
+    state.gatewayConnected = false;
+  }
+
+  async function pollGateway() {
+    if (gatewayPolling || !state.gatewayUrl) return false;
+
+    gatewayPolling = true;
+    const wasConnected = state.gatewayConnected;
+    let timeoutId = null;
+    let controller = null;
+
+    try {
+      if (typeof global.AbortController === 'function') {
+        controller = new global.AbortController();
+        timeoutId = global.setTimeout(() => controller.abort(), GATEWAY_TIMEOUT_MS);
+      }
+
+      const response = await global.fetch(`${state.gatewayUrl}/telemetry?t=${now()}`, {
+        cache: 'no-store',
+        signal: controller ? controller.signal : undefined,
+        headers: { Accept: 'application/json' }
+      });
+
+      if (timeoutId) global.clearTimeout(timeoutId);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const raw = await response.json();
+      if (!raw || typeof raw !== 'object') throw new Error('Gateway returned an empty payload.');
+
+      const previousMessageAt = state.lastMessageAt;
+      state.gatewayConnected = true;
+      state.gatewayFailures = 0;
+      state.gatewayError = null;
+      state.lastGatewayAt = now();
+      state.connected = true;
+      state.connectedAt = state.connectedAt || now();
+
+      handlePayload(state.appTopic, JSON.stringify(raw));
+
+      if (state.lastMessageAt === previousMessageAt) {
+        throw new Error('Gateway payload did not contain telemetry.');
+      }
+
+      if (!wasConnected) emit('status');
+      return true;
+    } catch (error) {
+      if (timeoutId) global.clearTimeout(timeoutId);
+
+      state.gatewayConnected = false;
+      state.gatewayFailures += 1;
+      state.gatewayError = `No reply from ${state.gatewayUrl}. Check the IP on the TFT NET page.`;
+
+      if (!state.data) {
+        state.status = 'offline';
+        state.error = state.gatewayError;
+      } else if (state.lastMessageAt && now() - state.lastMessageAt >= STALE_AFTER_MS) {
+        state.status = 'stale';
+      }
+
+      if (wasConnected || !state.data) emit('status');
+      return false;
+    } finally {
+      gatewayPolling = false;
+    }
+  }
+
+  function startGateway() {
+    if (gatewayTimer) return true;
+
+    state.mode = 'gateway';
+    state.connected = true;
+    state.connectedAt = state.connectedAt || now();
+    state.status = state.data ? 'live' : 'connecting';
+    state.error = null;
+
+    startWatchdog();
+    pollGateway();
+    gatewayTimer = global.setInterval(pollGateway, GATEWAY_POLL_MS);
+    emit('status');
+    return true;
+  }
+
   function start() {
+    return startGateway();
+  }
+
+  function refresh() {
+    return pollGateway();
+  }
+
+  function startMqtt() {
     if (client) return true;
+
+    stopGateway();
 
     if (!global.mqtt || typeof global.mqtt.connect !== 'function') {
       state.status = 'unavailable';
@@ -387,6 +544,8 @@
       return false;
     }
 
+    state.mode = 'mqtt';
+    state.connected = false;
     state.status = 'connecting';
     state.error = null;
     state.connectAttempts += 1;
@@ -462,6 +621,7 @@
   }
 
   function stop() {
+    stopGateway();
     stopWatchdog();
     if (telemetryTimer) {
       global.clearTimeout(telemetryTimer);
@@ -490,7 +650,10 @@
     const next = String(url || '').trim();
     if (!next) return false;
     state.brokerUrl = next;
-    if (client) restart();
+    if (client) {
+      stop();
+      startMqtt();
+    }
     return true;
   }
 

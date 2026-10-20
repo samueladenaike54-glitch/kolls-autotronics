@@ -229,7 +229,8 @@ const STATE = {
   trendRange: 30,
   live: null,
   liveStatus: null,
-  liveRenderedFresh: false
+  liveRenderedFresh: false,
+  liveVehicleAutoSelected: false
 };
 
 /* Illustrative history for the Trends page. */
@@ -875,6 +876,7 @@ function renderLiveDevice() {
   const status = window.OrionLive ? window.OrionLive.status() : null;
   const data = status && status.data ? status.data : STATE.live ? STATE.live.data : null;
   const fresh = Boolean(status && status.fresh) || isLiveFresh();
+  const gatewayMode = Boolean(status && status.mode === 'gateway');
   const age = status && status.ageMs !== null ? Math.max(0, Math.round(status.ageMs / 1000)) : liveAgeSeconds();
   const liveBadge = document.getElementById('live-badge');
   const liveBadgeText = document.getElementById('live-badge-text');
@@ -916,7 +918,7 @@ function renderLiveDevice() {
     } else {
       tone = 'warn';
       chipText = 'Stale';
-      setBadge('is-connecting', 'ESP32 waiting');
+      setBadge('is-connecting', gatewayMode ? 'ESP32 offline' : 'ESP32 waiting');
     }
   } else {
     setText('device-rpm', '--');
@@ -932,33 +934,40 @@ function renderLiveDevice() {
       tone = 'quiet';
       chipText = 'Connecting';
       setBadge('is-demo', 'Demo mode');
-      setText('device-subtitle', 'Waiting for the KA-TRUCK-001 gateway on HiveMQ.');
-      setText('device-meta', 'HiveMQ · kolls/vehicle/telemetry');
+      setText('device-subtitle', 'Waiting for the KA-TRUCK-001 gateway.');
+      setText('device-meta', 'Direct HTTP · /telemetry');
     } else if (status.status === 'connecting' || status.status === 'reconnecting') {
       tone = 'quiet';
       chipText = 'Connecting';
-      setBadge('is-connecting', 'Connecting');
-      setText('device-subtitle', `Connecting to ${status.brokerUrl}.`);
-      setText('device-meta', 'HiveMQ · kolls/vehicle/telemetry');
+      setBadge('is-connecting', gatewayMode ? 'Direct connect' : 'Connecting');
+      setText('device-subtitle', gatewayMode ? `Connecting directly to ${status.gatewayUrl}.` : `Connecting to ${status.brokerUrl}.`);
+      setText('device-meta', gatewayMode ? 'Direct HTTP · /telemetry' : 'HiveMQ · kolls/vehicle/telemetry');
+    } else if (gatewayMode && status.connected && !status.gatewayConnected) {
+      tone = 'quiet';
+      chipText = 'Offline';
+      setBadge('is-offline', 'ESP32 offline');
+      setText('device-subtitle', status.gatewayError || `No reply from ${status.gatewayUrl}. Check the IP on the TFT NET page.`);
+      setText('device-meta', `Direct HTTP · ${status.gatewayUrl}`);
+      setDeviceButtons(false);
     } else if (status.connected) {
       tone = 'quiet';
       chipText = 'Waiting';
-      setBadge('is-connecting', 'ESP32 waiting');
-      setText('device-subtitle', `Connected to HiveMQ. Waiting for ${status.vehicleId} telemetry...`);
-      setText('device-meta', `Live broker · ${status.topic}`);
+      setBadge('is-connecting', gatewayMode ? 'Direct · waiting' : 'ESP32 waiting');
+      setText('device-subtitle', gatewayMode ? `Connected to ${status.gatewayUrl}. Waiting for telemetry...` : `Connected to HiveMQ. Waiting for ${status.vehicleId} telemetry...`);
+      setText('device-meta', gatewayMode ? 'Direct HTTP · /telemetry' : `Live broker · ${status.topic}`);
     } else if (status.status === 'unavailable' || status.status === 'error' || status.status === 'offline') {
       tone = 'quiet';
       chipText = 'Offline';
-      setBadge('is-offline', 'Demo mode');
-      setText('device-subtitle', status.error || 'The live broker is offline. Showing the demo garage until the ESP32 reconnects.');
-      setText('device-meta', `HiveMQ · ${status.brokerUrl}`);
+      setBadge('is-offline', gatewayMode ? 'ESP32 offline' : 'Demo mode');
+      setText('device-subtitle', status.error || (gatewayMode ? `No reply from ${status.gatewayUrl}.` : 'The live broker is offline. Showing the demo garage until the ESP32 reconnects.'));
+      setText('device-meta', gatewayMode ? `Direct HTTP · ${status.gatewayUrl}` : `HiveMQ · ${status.brokerUrl}`);
       setDeviceButtons(false);
     } else {
       tone = 'quiet';
       chipText = 'Waiting';
-      setBadge('is-connecting', 'ESP32 waiting');
+      setBadge('is-connecting', gatewayMode ? 'Direct · waiting' : 'ESP32 waiting');
       setText('device-subtitle', `Waiting for ${status.vehicleId || 'KA-TRUCK-001'} telemetry...`);
-      setText('device-meta', `Live broker · ${status.topic}`);
+      setText('device-meta', gatewayMode ? `Direct HTTP · ${status.gatewayUrl}` : `Live broker · ${status.topic}`);
     }
   }
 
@@ -1367,6 +1376,12 @@ function runScan() {
 
     renderLastScan();
 
+    if (window.OrionLive && window.OrionLive.status().mode === 'gateway') {
+      window.OrionLive.refresh();
+      showToast('Requested a fresh frame from the ESP32 gateway.', 'good');
+      return;
+    }
+
     if (isLiveFresh() && window.OrionLive) {
       const sent = window.OrionLive.sendCommand('PING');
       showToast(
@@ -1390,6 +1405,16 @@ function handleLiveEvent(event) {
   if (detail.event === 'telemetry' && detail.data) {
     STATE.live = { data: detail.data, receivedAt: Date.now() };
     STATE.liveRenderedFresh = true;
+    ensureLiveVehicle(detail.data);
+
+    if (!STATE.liveVehicleAutoSelected) {
+      STATE.liveVehicleAutoSelected = true;
+      useLiveVehicle(detail.data, true);
+    } else if (STATE.currentCar === 'live') {
+      renderHeader();
+      renderGarage();
+    }
+
     renderHealth();
     renderLastScan();
     return;
@@ -1486,6 +1511,121 @@ function simulateRepair(id) {
 /* -----------------------------------------------------------------------------
    Garage, certificate and demo lab
    -------------------------------------------------------------------------- */
+
+function ensureLiveVehicle(data) {
+  if (!data) return null;
+
+  const fallback = CARS.suv;
+  const systems = data.systems || {};
+  const name = data.name || (data.vehicleId ? `ESP32 ${data.vehicleId}` : 'ESP32 live vehicle');
+
+  if (!CARS.live) {
+    CARS.live = Object.assign({}, fallback, {
+      name,
+      shortName: data.vehicleId || 'ESP32 live',
+      baseScore: Number.isFinite(data.score) ? data.score : fallback.baseScore,
+      battery: data.battery > 0 ? data.battery : fallback.battery,
+      coolant: data.coolant > 0 ? data.coolant : fallback.coolant,
+      range: Number.isFinite(data.range) ? data.range : fallback.range,
+      fuel: Number.isFinite(data.fuel) ? data.fuel : fallback.fuel,
+      tires: fallback.tires.slice(),
+      saved: 0,
+      systems: {
+        engine: Number.isFinite(systems.engine) ? systems.engine : fallback.systems.engine,
+        cooling: Number.isFinite(systems.cooling) ? systems.cooling : fallback.systems.cooling,
+        electrical: Number.isFinite(systems.electrical) ? systems.electrical : fallback.systems.electrical,
+        brakes: Number.isFinite(systems.brakes) ? systems.brakes : fallback.systems.brakes
+      },
+      cooling: {
+        value: Number.isFinite(systems.cooling) ? systems.cooling : fallback.cooling.value,
+        label: data.tone === 'danger' ? 'Critical' : data.tone === 'warn' ? 'Watch' : 'Good',
+        description: 'Live reading from the ESP32 gateway',
+        tone: data.tone === 'danger' ? 'danger' : data.tone === 'warn' ? 'warn' : 'good'
+      },
+      summary: 'Live telemetry from the ESP32 gateway over direct HTTP.',
+      repairs: []
+    });
+  } else {
+    CARS.live.name = name;
+    CARS.live.shortName = data.vehicleId || 'ESP32 live';
+    CARS.live.baseScore = Number.isFinite(data.score) ? data.score : CARS.live.baseScore;
+    CARS.live.battery = data.battery > 0 ? data.battery : CARS.live.battery;
+    CARS.live.coolant = data.coolant > 0 ? data.coolant : CARS.live.coolant;
+    CARS.live.range = Number.isFinite(data.range) ? data.range : CARS.live.range;
+    CARS.live.fuel = Number.isFinite(data.fuel) ? data.fuel : CARS.live.fuel;
+    CARS.live.systems = {
+      engine: Number.isFinite(systems.engine) ? systems.engine : CARS.live.systems.engine,
+      cooling: Number.isFinite(systems.cooling) ? systems.cooling : CARS.live.systems.cooling,
+      electrical: Number.isFinite(systems.electrical) ? systems.electrical : CARS.live.systems.electrical,
+      brakes: Number.isFinite(systems.brakes) ? systems.brakes : CARS.live.systems.brakes
+    };
+  }
+
+  const item = document.getElementById('garage-live');
+  if (item) {
+    item.hidden = false;
+    setText('garage-live-name', CARS.live.name);
+    setText('garage-live-meta', `${data.vehicleId || 'ESP32'} · direct gateway`);
+  }
+
+  return CARS.live;
+}
+
+function useLiveVehicle(data, announce) {
+  const car = ensureLiveVehicle(data);
+  if (!car) return false;
+
+  if (STATE.currentCar === 'live') {
+    renderHeader();
+    renderGarage();
+    return true;
+  }
+
+  STATE.currentCar = 'live';
+  STATE.demo = null;
+  STATE.resolved.clear();
+  STATE.score = car.baseScore;
+  STATE.saved = 0;
+  STATE.lastScan = new Date();
+
+  renderAll();
+  if (announce) showToast('ESP32 live — switched to the test vehicle.', 'good');
+  return true;
+}
+
+function connectEsp32() {
+  if (!window.OrionLive) {
+    showToast('The live gateway bridge did not load.', 'warn');
+    return;
+  }
+
+  const status = window.OrionLive.status();
+
+  if (status.fresh && status.data) {
+    STATE.liveVehicleAutoSelected = true;
+    useLiveVehicle(status.data, true);
+    renderHealth();
+    return;
+  }
+
+  window.OrionLive.start();
+  window.OrionLive.refresh();
+  renderLiveDevice();
+
+  const url = status.gatewayUrl || window.OrionLive.gatewayUrl();
+  showToast(`Direct connecting to ${url}. Check the IP on the gateway TFT.`, 'good');
+
+  window.setTimeout(() => {
+    const current = window.OrionLive.status();
+    if (current.fresh && current.data) {
+      STATE.liveVehicleAutoSelected = true;
+      useLiveVehicle(current.data, false);
+      showToast('ESP32 live — test vehicle selected.', 'good');
+    } else {
+      showToast(`No reply from ${url}. Use ?gateway=http://NEW-IP on the app URL.`, 'warn');
+    }
+  }, 3000);
+}
 
 function selectCar(key) {
   if (!CARS[key]) return;
@@ -1980,6 +2120,7 @@ window.runScan = runScan;
 window.simulateRepair = simulateRepair;
 window.selectCar = selectCar;
 window.openGarageModal = openGarageModal;
+window.connectEsp32 = connectEsp32;
 window.openCertModal = openCertModal;
 window.openSimModal = openSimModal;
 window.triggerTestScenario = triggerTestScenario;
