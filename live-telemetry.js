@@ -20,10 +20,18 @@
   const STALE_AFTER_MS = 9000;
   const WAITING_AFTER_MS = 10000;
 
-  function storedGateway() {
+  function gatewayOverride() {
     try {
-      const query = new URLSearchParams(global.location.search).get('gateway');
-      if (query) return normaliseGatewayUrl(query);
+      return normaliseGatewayUrl(new URLSearchParams(global.location.search).get('gateway'));
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function storedGateway() {
+    const override = gatewayOverride();
+    if (override) return override;
+    try {
       const saved = global.localStorage.getItem(GATEWAY_STORAGE_KEY);
       return saved ? normaliseGatewayUrl(saved) : DEFAULT_GATEWAY;
     } catch (error) {
@@ -525,11 +533,14 @@
   }
 
   function start() {
-    return startGateway();
+    if (gatewayOverride()) return startGateway();
+    return startMqtt();
   }
 
   function refresh() {
-    return pollGateway();
+    if (state.mode === 'gateway') return pollGateway();
+    if (state.mode === 'mqtt') return startMqtt();
+    return false;
   }
 
   function startMqtt() {
@@ -686,9 +697,14 @@
 
   global.OrionLive = {
     start,
+    startMqtt,
+    startGateway,
     stop,
     restart,
+    refresh,
     setBroker,
+    setGateway,
+    gatewayUrl,
     sendCommand,
     status,
     healthyScore,
