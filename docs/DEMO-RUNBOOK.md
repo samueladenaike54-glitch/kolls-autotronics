@@ -15,11 +15,11 @@
 
 | Mode | What the audience sees | Needs internet? | Use when |
 |---|---|---|---|
-| **A — Device-hosted page** | The gateway's own live dashboard at `http://<ip>/` | ❌ no | Always works. Your fallback. |
-| **B — Polished app ← gateway** | The real Kolls app, fed by `fetch('http://<ip>/telemetry')` | ❌ no | Main act — best visual |
-| **C — Cloud MQTT** | The real app fed by the HiveMQ broker | ✅ yes | Only if the venue WiFi is solid |
+| **C — Cloud MQTT ⭐** | The real app, fed by **EMQX Serverless** over WSS | ✅ yes (hotspot data) | **Main act.** Works from the hosted site, phone or laptop — no local server |
+| **B — Direct HTTP** | The app polling `http://<esp-ip>/telemetry` | ❌ no | Fallback when the broker is unreachable. Needs the app served over local HTTP (mixed-content rule) |
+| **A — Device-hosted page** | The gateway's own live dashboard at `http://<ip>/` | ❌ no | Last-resort fallback. Always works |
 
-**Recommendation:** run **B** as the main act, keep **A** open in a second tab as the instant fallback. If B is slow or blank, switch tabs — you never show a broken screen.
+**Recommendation:** run **C** as the main act (it is the only mode that needs no laptop server), keep **A** open in a second tab as the instant fallback. If C is slow or blank, switch tabs — you never show a broken screen.
 
 ---
 
@@ -62,6 +62,16 @@ http://127.0.0.1:8123/index.html?gateway=http://192.168.43.123
 ```
 
 …or any static server in the project folder, e.g. `npx serve -l 8123`.
+
+### ☁️ Cloud path (needs no laptop at all)
+
+The gateway publishes to **EMQX Serverless over TLS (8883)**; the app subscribes over **WSS**. Because the app is on `https://` and the broker connection is `wss://`, there is **no mixed-content block** — so the **hosted site works as-is**, and the demo runs from a phone.
+
+```
+ESP32 ──MQTT/TLS 8883──▶ EMQX Serverless ──WSS──▶ browser (any device, any network)
+```
+
+Only requirement: the hotspot has data. Verify the badge flips to **"ESP32 live"**.
 
 **Hotspot tips**
 - Use a phone hotspot, **not** venue WiFi — venue WiFi usually has *client isolation* (blocks laptop → ESP) and captive portals that break HTTP

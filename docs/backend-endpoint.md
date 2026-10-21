@@ -24,20 +24,24 @@
 ## 1. How the link works
 
 ```text
-┌──────────────┐   CAN 500kbps    ┌──────────────────────┐   MQTT publish
+┌──────────────┐   CAN 500kbps    ┌──────────────────────┐   MQTT/TLS publish
 │ Vehicle ECU  │ ◄──────────────► │ MS309-3 donor board  │───────────────┐
 └──────────────┘   OBD-II pins    │ (8-pin transceiver)  │               ▼
                                   │ + ESP32 (TWAI+WiFi)  │    ┌─────────────────────┐
-                                  └──────────────────────┘    │ broker.hivemq.com   │
-                                                              │  MQTT  1883         │
-  Web dashboard (app agent side) ◄──── MQTT subscribe ────────│  WS    8884 (/mqtt) │
+                                  └──────────────────────┘    │ EMQX Serverless     │
+                                                              │ TLS 8883 (MQTT)    │
+  Web / phone app (browser)  ◄── MQTT over WSS (8884) ────────│ 8884 (WebSocket)   │
                                                               └─────────────────────┘
 ```
 
-- **Transport:** public HiveMQ broker — `broker.hivemq.com`, plain MQTT port `1883`
-- **For browser apps:** WebSocket `wss://broker.hivemq.com:8884/mqtt` (compatible with the README's documented `8884` WebSocket endpoint, e.g. MQTT.js with `clean: true`)
+- **Broker:** `l90668f6.ala.us-east-1.emqxsl.com` (EMQX Serverless)
+- **Device → broker:** MQTT over **TLS on port 8883**, with username/password auth
+- **App → broker:** MQTT over **WSS** (same hostname, WebSocket port) — a secure context, so a page served from GitHub Pages (**https**) can subscribe without any mixed-content problem and **without a local server or laptop**
 - **Data topic:** `kolls/vehicle/telemetry` (ESP32 publishes here every **2 seconds**)
+- **App-shaped topic:** `kolls/vehicle/KA-TRUCK-001/app` (the dashboard's live feed)
 - **Command topic:** `kolls/vehicle/KA-TRUCK-001/commands` (app → ESP32)
+
+> ⚠️ The demo credentials are compiled into the firmware **and** visible in the site's JavaScript. Rotate the password after Saturday.
 
 ## 2. Telemetry payload (published every 2 s)
 

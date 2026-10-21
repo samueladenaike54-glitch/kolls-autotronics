@@ -43,6 +43,7 @@
 //                                   SYSTEM INCLUDES
 // ==============================================================================================
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <WebServer.h>
@@ -62,10 +63,13 @@
 //                                   CONFIGURATION
 // ==============================================================================================
 // Network & telematics endpoint (the "backend endpoint" consumed by the web dashboard app).
+// EMQX Serverless over TLS (8883) - works from a phone hotspot with no laptop/server.
 const char* WIFI_SSID     = "ORION";
 const char* WIFI_PASS     = "12345678";
-const char* MQTT_BROKER   = "broker.hivemq.com";
-const int   MQTT_PORT     = 1883;
+const char* MQTT_BROKER   = "l90668f6.ala.us-east-1.emqxsl.com";
+const int   MQTT_PORT     = 8883;
+const char* MQTT_USER     = "orionx";
+const char* MQTT_PASS     = "samuel123";
 const char* MQTT_TOPIC    = "kolls/vehicle/telemetry";
 const char* MQTT_CMD_FMT  = "kolls/vehicle/%s/commands";   // printf-style with VEHICLE_ID
 const char* MQTT_APP_FMT  = "kolls/vehicle/%s/app";        // app-shaped payload (mirrors the web app data model)
@@ -165,7 +169,7 @@ struct DeviceState {
 // ==============================================================================================
 //                                   GLOBAL STATE
 // ==============================================================================================
-WiFiClient espClient;
+WiFiClientSecure espClient;   // TLS client for EMQX Serverless (8883)
 PubSubClient mqttClient(espClient);
 WebServer  httpServer(80);      // direct-connect demo server (defined early: used in loop())
 
@@ -273,6 +277,11 @@ void setup() {
 
   snprintf(mqttCmdTopic, sizeof(mqttCmdTopic), MQTT_CMD_FMT, VEHICLE_ID);
   snprintf(mqttAppTopic, sizeof(mqttAppTopic), MQTT_APP_FMT, VEHICLE_ID);
+
+  // TLS to EMQX Serverless. setInsecure() skips certificate validation -
+  // DEMO ONLY: for production pin the EMQX CA certificate with
+  // espClient.setCACert(root_ca) and drop this call.
+  espClient.setInsecure();
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
   mqttClient.setCallback(mqttCallback);
   mqttClient.setBufferSize(640);
@@ -793,7 +802,7 @@ bool connectMQTT() {
     String clientId = "KollsAutoTronics_" + String(VEHICLE_ID) + "_" + String(random(0x1000, 0xFFFF), HEX);
     Serial.printf("[MQTT] Connecting to %s:%d as %s... ", MQTT_BROKER, MQTT_PORT, clientId.c_str());
 
-    if (mqttClient.connect(clientId.c_str())) {
+    if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASS)) {
       Serial.println(F("CONNECTED!"));
       mqttConnected = true;
       mqttClient.subscribe(mqttCmdTopic);

@@ -3,9 +3,15 @@ HEY — handing over the backend for the Saturday competition. Please read fully
 ────────────────────────────────────────
 CONTEXT
 ────────────────────────────────────────
-We have a competition on Saturday and there is NO time for a cloud pipeline. So the
-backend runs in DIRECT-CONNECT mode: the ESP32 gateway serves its own HTTP API on
-the local network. No broker, no internet, no registration, no device tags.
+We have a competition on Saturday. The backend is DONE and flash-ready. The only
+thing missing is the app binding live values to the UI you are building.
+
+**Transport (updated):** the gateway now publishes to **EMQX Serverless over TLS
+(8883)** with username/password auth, and the app subscribes over **WSS**. Because
+the hosted site is `https://` and the broker link is `wss://`, there is **no
+mixed-content block** — the demo runs from a phone with **no local server and no
+laptop**. The local-HTTP `?gateway=` direct-connect path remains as a fallback
+(it needs the app served over `http://`).
 
 The hardware/firmware side is DONE and flash-ready. The only thing missing is the
 app binding live values to the UI you are building.
