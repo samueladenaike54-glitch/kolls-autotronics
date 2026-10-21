@@ -8,7 +8,9 @@
 (function (global) {
   'use strict';
 
-  const DEFAULT_BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+  const DEFAULT_BROKER = 'wss://l90668f6.ala.us-east-1.emqxsl.com:8084/mqtt';
+  const DEFAULT_USERNAME = 'orionx';
+  const DEFAULT_PASSWORD = 'samuel123';
   const DEFAULT_GATEWAY = 'http://192.168.43.123';
   const GATEWAY_STORAGE_KEY = 'orion.gatewayUrl';
   const GATEWAY_POLL_MS = 1000;
@@ -565,6 +567,8 @@
     try {
       client = global.mqtt.connect(state.brokerUrl, {
         clientId: `orion_web_${Math.random().toString(16).slice(2, 10)}`,
+        username: DEFAULT_USERNAME,
+        password: DEFAULT_PASSWORD,
         clean: true,
         connectTimeout: 8000,
         reconnectPeriod: 5000,

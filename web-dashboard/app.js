@@ -918,7 +918,7 @@ function renderLiveDevice() {
     } else {
       tone = 'warn';
       chipText = 'Stale';
-      setBadge('is-connecting', gatewayMode ? 'ESP32 offline' : 'HiveMQ stale');
+      setBadge('is-connecting', gatewayMode ? 'ESP32 offline' : 'EMQX stale');
     }
   } else {
     setText('device-rpm', '--');
@@ -939,9 +939,9 @@ function renderLiveDevice() {
     } else if (status.status === 'connecting' || status.status === 'reconnecting') {
       tone = 'quiet';
       chipText = 'Connecting';
-      setBadge('is-connecting', gatewayMode ? 'Direct connect' : 'HiveMQ connecting');
+      setBadge('is-connecting', gatewayMode ? 'Direct connect' : 'EMQX connecting');
       setText('device-subtitle', gatewayMode ? `Connecting directly to ${status.gatewayUrl}.` : `Connecting to ${status.brokerUrl}.`);
-      setText('device-meta', gatewayMode ? 'Direct HTTP · /telemetry' : 'HiveMQ · kolls/vehicle/telemetry');
+      setText('device-meta', gatewayMode ? 'Direct HTTP · /telemetry' : 'EMQX · kolls/vehicle/telemetry');
     } else if (gatewayMode && status.connected && !status.gatewayConnected) {
       tone = 'quiet';
       chipText = 'Offline';
@@ -952,15 +952,15 @@ function renderLiveDevice() {
     } else if (status.connected) {
       tone = 'quiet';
       chipText = 'Waiting';
-      setBadge('is-connecting', gatewayMode ? 'Direct · waiting' : 'HiveMQ waiting');
-      setText('device-subtitle', gatewayMode ? `Connected to ${status.gatewayUrl}. Waiting for telemetry...` : `Connected to HiveMQ. Waiting for ${status.vehicleId} telemetry...`);
+      setBadge('is-connecting', gatewayMode ? 'Direct · waiting' : 'EMQX waiting');
+      setText('device-subtitle', gatewayMode ? `Connected to ${status.gatewayUrl}. Waiting for telemetry...` : `Connected to EMQX. Waiting for ${status.vehicleId} telemetry...`);
       setText('device-meta', gatewayMode ? 'Direct HTTP · /telemetry' : `Live broker · ${status.topic}`);
     } else if (status.status === 'unavailable' || status.status === 'error' || status.status === 'offline') {
       tone = 'quiet';
       chipText = 'Offline';
-      setBadge('is-offline', gatewayMode ? 'ESP32 offline' : 'HiveMQ offline');
-      setText('device-subtitle', status.error || (gatewayMode ? `No reply from ${status.gatewayUrl}.` : 'HiveMQ is unreachable. Check internet on this phone and the ESP32.'));
-      setText('device-meta', gatewayMode ? `Direct HTTP · ${status.gatewayUrl}` : `HiveMQ · ${status.brokerUrl}`);
+      setBadge('is-offline', gatewayMode ? 'ESP32 offline' : 'EMQX offline');
+      setText('device-subtitle', status.error || (gatewayMode ? `No reply from ${status.gatewayUrl}.` : 'EMQX is unreachable. Check internet on this phone and the ESP32.'));
+      setText('device-meta', gatewayMode ? `Direct HTTP · ${status.gatewayUrl}` : `EMQX · ${status.brokerUrl}`);
       setDeviceButtons(false);
     } else {
       tone = 'quiet';
@@ -1618,7 +1618,7 @@ function connectEsp32() {
     showToast(`Direct connecting to ${window.OrionLive.gatewayUrl()}. Check the IP on the gateway TFT.`, 'good');
   } else {
     window.OrionLive.startMqtt();
-    showToast('Connecting to HiveMQ. Phone and ESP32 need internet.', 'good');
+    showToast('Connecting to EMQX. Phone and ESP32 need internet.', 'good');
   }
 
   window.setTimeout(() => {
@@ -1630,7 +1630,7 @@ function connectEsp32() {
     } else if (direct) {
       showToast(`No reply from ${window.OrionLive.gatewayUrl()}. Use ?gateway=http://NEW-IP on the app URL.`, 'warn');
     } else {
-      showToast('HiveMQ has not delivered a packet yet. Check internet and the ESP32 gateway.', 'warn');
+      showToast('EMQX has not delivered a packet yet. Check internet and the ESP32 gateway.', 'warn');
     }
   }, 6000);
 }
