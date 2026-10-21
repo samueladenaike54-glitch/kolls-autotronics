@@ -1701,14 +1701,15 @@ function fleetLocationLabel(location) {
         ? 'IP estimate'
         : '';
   if (!source) return '';
+  const expired = (location.source === 'app' || location.source === 'gps') && location.fix > 0 && location.ageS > 120;
   const place = location.city || `${location.lat.toFixed(3)}, ${location.lon.toFixed(3)}`;
-  return `${source} · ${place}`;
+  return `${source}${expired ? ' (expired)' : ''} · ${place}`;
 }
 
 function liveMapPosition(location) {
   if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lon)) return null;
   const isIp = location.source === 'ip';
-  const isFix = (location.source === 'app' || location.source === 'gps') && location.fix > 0;
+  const isFix = (location.source === 'app' || location.source === 'gps') && location.fix > 0 && location.ageS <= 120;
   if (!isIp && !isFix) return null;
 
   const lonMin = 3.18;

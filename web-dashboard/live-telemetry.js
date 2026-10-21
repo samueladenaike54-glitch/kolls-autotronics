@@ -182,7 +182,7 @@
   function locationRank(location) {
     if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lon)) return -1;
     if (location.source === 'app' || location.source === 'gps') {
-      return location.fix > 0 ? 4 : 1;
+      return location.fix > 0 && location.ageS <= 120 ? 4 : 1;
     }
     if (location.source === 'ip') return 2;
     return 1;

@@ -852,7 +852,17 @@ function renderTires() {
 function locationSourceView(location) {
   const source = location && location.source ? location.source : 'none';
   const fix = location ? Number(location.fix) || 0 : 0;
+  const age = location ? Number(location.ageS) || 0 : 0;
+  const expired = (source === 'app' || source === 'gps') && fix > 0 && age > 120;
 
+  if (expired) {
+    return {
+      chip: 'Fix expired',
+      tone: 'warn',
+      fix: 'Expired',
+      long: source === 'app' ? 'phone GPS fix' : 'ESP32 GPS fix'
+    };
+  }
   if (source === 'app') {
     return {
       chip: 'Phone GPS',
@@ -902,6 +912,8 @@ function renderLocation() {
   const view = locationSourceView(location);
   const fresh = isLiveFresh();
   const hasCoords = Boolean(location && Number.isFinite(location.lat) && Number.isFinite(location.lon));
+  const expired = Boolean(location && (location.source === 'app' || location.source === 'gps')
+    && location.fix > 0 && location.ageS > 120);
   const place = location && (location.city || location.country)
     ? [location.city, location.country].filter(Boolean).join(', ')
     : hasCoords ? 'Live position' : 'Location unavailable';
@@ -929,6 +941,8 @@ function renderLocation() {
     subtitle = 'The ESP32 has not resolved a position yet.';
   } else if (location && location.source === 'ip') {
     subtitle = 'City-level estimate from the ESP32 — not a GPS fix.';
+  } else if (expired) {
+    subtitle = `The last ${view.long} has expired; the ESP32 will fall back to IP level.`;
   } else if (location && location.fix > 0) {
     subtitle = `Real ${view.long} from the ESP32.`;
   } else if (location) {
@@ -945,7 +959,7 @@ function renderLocation() {
   if (hint) {
     hint.textContent = gatewayMode
       ? 'Direct HTTP mode is read-only. Use the MQTT feed to push browser GPS to the ESP32.'
-      : location && location.source === 'app' && location.fix > 0
+      : location && location.source === 'app' && location.fix > 0 && !expired
         ? 'This fix came from the phone and is echoed by the ESP32. App-pushed fixes expire after 2 minutes.'
         : 'Browser GPS is sent to the ESP32 over MQTT, then echoed back with source “app”.';
   }
