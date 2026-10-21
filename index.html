@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <link rel="stylesheet" href="styles.css?v=13.3">
+  <link rel="stylesheet" href="styles.css?v=13.4">
 </head>
 <body>
   <svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
@@ -301,6 +301,41 @@
               </div>
 
               <div class="card-foot" id="tpms-footnote"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Pressure checked 2 minutes ago</div>
+            </article>
+
+            <article class="card location-card">
+              <div class="card-head">
+                <div>
+                  <h2>Live location</h2>
+                  <p id="location-sub">Waiting for the ESP32 location feed</p>
+                </div>
+                <span class="chip chip--quiet" id="location-source-chip"><span class="status-dot" aria-hidden="true"></span><span id="location-source">No fix</span></span>
+              </div>
+
+              <div class="location-body">
+                <div class="location-primary">
+                  <span class="location-icon" aria-hidden="true"><i class="fa-solid fa-location-crosshairs"></i></span>
+                  <div class="location-copy">
+                    <strong id="location-place">Location unavailable</strong>
+                    <span id="location-coords">--</span>
+                  </div>
+                </div>
+
+                <dl class="location-facts">
+                  <div><dt>Fix</dt><dd id="location-fix">None</dd></div>
+                  <div><dt>Satellites</dt><dd id="location-sats">0</dd></div>
+                  <div><dt>Age</dt><dd id="location-age">--</dd></div>
+                  <div><dt>Speed</dt><dd id="location-speed">--</dd></div>
+                </dl>
+
+                <div class="location-action">
+                  <button class="btn btn-secondary btn-sm" type="button" id="location-use-btn" onclick="useMyLocation()">
+                    <i class="fa-solid fa-location-arrow" aria-hidden="true"></i>
+                    <span>Use my location</span>
+                  </button>
+                  <p class="location-hint" id="location-hint">Browser GPS is sent to the ESP32 over MQTT, then echoed back with source “app”.</p>
+                </div>
+              </div>
             </article>
 
           </div>
@@ -896,8 +931,8 @@
   </div>
 
   <script src="mqtt.min.js?v=5.10.4"></script>
-  <script src="live-telemetry.js?v=1.4"></script>
+  <script src="live-telemetry.js?v=1.5"></script>
   <script src="ai-engine.js?v=1.1"></script>
-  <script src="app.js?v=12.7"></script>
+  <script src="app.js?v=12.8"></script>
 </body>
 </html>

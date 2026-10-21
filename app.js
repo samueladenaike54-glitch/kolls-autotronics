@@ -704,6 +704,7 @@ function renderHealth() {
   renderSystems();
   renderCooling();
   renderTires();
+  renderLocation();
   renderConnection(copy.tone);
   renderAiModel();
   renderLiveDevice();
@@ -846,6 +847,192 @@ function renderTires() {
       ? '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> TPMS is not on the ESP32 CAN feed; values are a garage estimate.'
       : '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Pressure checked 2 minutes ago';
   }
+}
+
+function locationSourceView(location) {
+  const source = location && location.source ? location.source : 'none';
+  const fix = location ? Number(location.fix) || 0 : 0;
+
+  if (source === 'app') {
+    return {
+      chip: 'Phone GPS',
+      tone: fix > 0 ? 'good' : 'warn',
+      fix: fix === 2 ? 'DGPS fix' : fix === 1 ? 'GPS fix' : 'No fix',
+      long: fix > 0 ? 'phone GPS fix' : 'phone location without a fix'
+    };
+  }
+  if (source === 'gps') {
+    return {
+      chip: 'GPS fix',
+      tone: fix > 0 ? 'good' : 'warn',
+      fix: fix === 2 ? 'DGPS fix' : fix === 1 ? 'GPS fix' : 'No fix',
+      long: fix > 0 ? 'ESP32 GPS fix' : 'ESP32 location without a fix'
+    };
+  }
+  if (source === 'ip') {
+    return { chip: 'IP estimate', tone: 'warn', fix: 'IP-level', long: 'city-level IP estimate' };
+  }
+  return { chip: 'No fix', tone: 'quiet', fix: 'None', long: 'location' };
+}
+
+function formatCoordinate(value, axis) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '--';
+  const direction = axis === 'lat' ? (number >= 0 ? 'N' : 'S') : (number >= 0 ? 'E' : 'W');
+  return `${Math.abs(number).toFixed(4)}° ${direction}`;
+}
+
+function formatLocationAge(location) {
+  const age = location ? Number(location.ageS) : NaN;
+  if (!Number.isFinite(age)) return '--';
+  if (age <= 2) return 'just now';
+  if (age < 60) return `${Math.round(age)}s ago`;
+  return `${Math.round(age / 60)}m ago`;
+}
+
+function isGatewayReadOnly(status) {
+  return Boolean(status && status.mode === 'gateway' && status.status !== 'idle');
+}
+
+function renderLocation() {
+  const status = window.OrionLive ? window.OrionLive.status() : null;
+  const last = STATE.live ? STATE.live.data : null;
+  const data = getLiveData() || last;
+  const location = data && data.location ? data.location : null;
+  const view = locationSourceView(location);
+  const fresh = isLiveFresh();
+  const hasCoords = Boolean(location && Number.isFinite(location.lat) && Number.isFinite(location.lon));
+  const place = location && (location.city || location.country)
+    ? [location.city, location.country].filter(Boolean).join(', ')
+    : hasCoords ? 'Live position' : 'Location unavailable';
+
+  setText('location-place', place);
+  setText('location-coords', hasCoords
+    ? `${formatCoordinate(location.lat, 'lat')} · ${formatCoordinate(location.lon, 'lon')}`
+    : '--');
+  setText('location-fix', view.fix);
+  const satsText = hasCoords && (location.source === 'ip' || (location.source === 'app' && !location.sats))
+    ? 'n/a'
+    : hasCoords ? String(location.sats || 0) : '--';
+  setText('location-sats', satsText);
+  setText('location-age', hasCoords ? formatLocationAge(location) : '--');
+  setText('location-speed', hasCoords ? `${Math.round(location.speedKmh || 0)} km/h` : '--');
+  setText('location-source', view.chip);
+
+  const sourceChip = document.getElementById('location-source-chip');
+  if (sourceChip) sourceChip.className = `chip chip--${view.tone}`;
+
+  let subtitle = 'Waiting for the ESP32 location feed';
+  if (data && !location) {
+    subtitle = 'The current ESP32 packet did not include location data.';
+  } else if (location && !hasCoords) {
+    subtitle = 'The ESP32 has not resolved a position yet.';
+  } else if (location && location.source === 'ip') {
+    subtitle = 'City-level estimate from the ESP32 — not a GPS fix.';
+  } else if (location && location.fix > 0) {
+    subtitle = `Real ${view.long} from the ESP32.`;
+  } else if (location) {
+    subtitle = `The ESP32 reports ${view.long}; no satellite fix yet.`;
+  }
+  if (data && !fresh) {
+    const age = liveAgeSeconds();
+    subtitle += age === null ? ' Last known position.' : ` Last known ${age}s ago.`;
+  }
+  setText('location-sub', subtitle);
+
+  const gatewayMode = isGatewayReadOnly(status);
+  const hint = document.getElementById('location-hint');
+  if (hint) {
+    hint.textContent = gatewayMode
+      ? 'Direct HTTP mode is read-only. Use the MQTT feed to push browser GPS to the ESP32.'
+      : location && location.source === 'app' && location.fix > 0
+        ? 'This fix came from the phone and is echoed by the ESP32. App-pushed fixes expire after 2 minutes.'
+        : 'Browser GPS is sent to the ESP32 over MQTT, then echoed back with source “app”.';
+  }
+
+  const button = document.getElementById('location-use-btn');
+  if (button) {
+    button.disabled = gatewayMode;
+    const label = button.querySelector('span');
+    if (label) label.textContent = gatewayMode ? 'MQTT required' : 'Use my location';
+  }
+}
+
+function useMyLocation() {
+  const status = window.OrionLive ? window.OrionLive.status() : null;
+  const button = document.getElementById('location-use-btn');
+  const label = button ? button.querySelector('span') : null;
+  const originalLabel = label ? label.textContent : 'Use my location';
+
+  if (isGatewayReadOnly(status)) {
+    showToast('Direct HTTP mode is read-only. Start the MQTT feed to push browser GPS.', 'warn');
+    return;
+  }
+
+  if (!window.OrionLive || typeof window.OrionLive.sendLocation !== 'function') {
+    showToast('The live MQTT bridge is unavailable.', 'warn');
+    return;
+  }
+
+  if (!navigator.geolocation) {
+    showToast('This browser does not support GPS location.', 'warn');
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.classList.add('is-scanning');
+  }
+  if (label) label.textContent = 'Locating…';
+  showToast('Requesting phone GPS…', 'good');
+
+  const finish = () => {
+    if (button) {
+      button.disabled = false;
+      button.classList.remove('is-scanning');
+    }
+    if (label) label.textContent = originalLabel;
+  };
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const coords = position.coords;
+      const speedKmh = Number.isFinite(coords.speed) ? coords.speed * 3.6 : null;
+      const sent = window.OrionLive.sendLocation({
+        lat: coords.latitude,
+        lon: coords.longitude,
+        sats: 0,
+        fix: 1,
+        speedKmh,
+        altM: Number.isFinite(coords.altitude) ? coords.altitude : null
+      });
+
+      finish();
+
+      if (!sent) {
+        showToast('GPS acquired, but the ESP32 is not connected. Start the live feed and try again.', 'warn');
+        return;
+      }
+
+      const hint = document.getElementById('location-hint');
+      if (hint) hint.textContent = 'Phone GPS sent. The ESP32 will echo the fix in its next packet.';
+      showToast('Phone GPS sent to the ESP32. Waiting for the echo…', 'good');
+    },
+    (error) => {
+      finish();
+      const code = error && error.code;
+      if (code === 1) {
+        showToast('Location permission was denied. Allow location access for this site.', 'warn');
+      } else if (code === 2) {
+        showToast('The phone could not get a GPS fix. Move outside or near a window.', 'warn');
+      } else if (code === 3) {
+        showToast('GPS timed out. Try again outside or near a window.', 'warn');
+      } else {
+        showToast('Could not read the phone GPS. Try again.', 'warn');
+      }
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
+  );
 }
 
 function renderLastScan() {
@@ -1430,6 +1617,7 @@ function handleLiveEvent(event) {
     return;
   }
 
+  renderLocation();
   renderLiveDevice();
 }
 
@@ -2129,6 +2317,7 @@ window.simulateRepair = simulateRepair;
 window.selectCar = selectCar;
 window.openGarageModal = openGarageModal;
 window.connectEsp32 = connectEsp32;
+window.useMyLocation = useMyLocation;
 window.openCertModal = openCertModal;
 window.openSimModal = openSimModal;
 window.triggerTestScenario = triggerTestScenario;

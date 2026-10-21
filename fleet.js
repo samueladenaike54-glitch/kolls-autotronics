@@ -711,6 +711,9 @@ function renderMap(containerId, vehicles, variant) {
     ${legend}
     <span class="map-sample-badge">${variant === 'overview' ? 'Sample map' : 'Illustrative map'}</span>
   `;
+
+  const live = window.OrionLive ? window.OrionLive.status() : null;
+  if (live && live.data) updateLiveMapPin(live.data.location);
 }
 
 function renderBadges() {
@@ -1688,6 +1691,73 @@ function renderAll() {
   renderBadges();
 }
 
+function fleetLocationLabel(location) {
+  if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lon)) return '';
+  const source = location.source === 'app'
+    ? 'Phone GPS'
+    : location.source === 'gps'
+      ? 'GPS'
+      : location.source === 'ip'
+        ? 'IP estimate'
+        : '';
+  if (!source) return '';
+  const place = location.city || `${location.lat.toFixed(3)}, ${location.lon.toFixed(3)}`;
+  return `${source} · ${place}`;
+}
+
+function liveMapPosition(location) {
+  if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lon)) return null;
+  const isIp = location.source === 'ip';
+  const isFix = (location.source === 'app' || location.source === 'gps') && location.fix > 0;
+  if (!isIp && !isFix) return null;
+
+  const lonMin = 3.18;
+  const lonMax = 3.66;
+  const latMin = 6.40;
+  const latMax = 6.72;
+  if (location.lon < lonMin || location.lon > lonMax || location.lat < latMin || location.lat > latMax) {
+    return null;
+  }
+
+  return {
+    x: Math.max(4, Math.min(96, ((location.lon - lonMin) / (lonMax - lonMin)) * 100)),
+    y: Math.max(4, Math.min(96, ((latMax - location.lat) / (latMax - latMin)) * 100))
+  };
+}
+
+function updateLiveMapPin(location) {
+  const position = liveMapPosition(location);
+
+  ['overview-map', 'tracking-map'].forEach((containerId) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const existing = container.querySelector('.map-pin--live');
+    if (!position) {
+      if (existing) existing.remove();
+      return;
+    }
+
+    const sourceLabel = location.source === 'ip' ? 'IP EST.' : 'GPS';
+    const place = location.city || `${location.lat.toFixed(3)}, ${location.lon.toFixed(3)}`;
+    const active = location.fix > 0 ? ' map-pin--active' : '';
+    const html = `
+      <span class="map-pin map-pin--live${active}" data-source="${escapeHtml(location.source || 'none')}" style="--x:${position.x.toFixed(1)}%;--y:${position.y.toFixed(1)}%" role="img"
+        aria-label="Live ESP32 location, ${escapeHtml(place)}, ${sourceLabel === 'GPS' ? 'GPS fix' : 'city-level IP estimate'}">
+        <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>
+        <span class="map-pin-label">LIVE · ${sourceLabel}</span>
+      </span>
+    `;
+
+    if (existing) {
+      existing.outerHTML = html;
+    } else {
+      const pins = container.querySelector('.map-pins');
+      if (pins) pins.insertAdjacentHTML('beforeend', html);
+    }
+  });
+}
+
 function updateFleetLive() {
   const card = document.getElementById('fleet-live-device');
   if (!card) return;
@@ -1709,12 +1779,13 @@ function updateFleetLive() {
 
   if (data) {
     const tone = data.tone || (data.severity === 2 ? 'danger' : data.severity === 1 ? 'warn' : 'good');
+    const locationText = fleetLocationLabel(data.location);
     card.dataset.state = tone;
     if (title) title.textContent = fresh ? `${data.vehicleId} · live gateway` : `${data.vehicleId} · last seen`;
     if (sub) {
       sub.textContent = fresh
-        ? `${data.statusText} · ${data.canFeed} · updated ${age}s ago`
-        : `Last packet ${age}s ago. The fleet sample records remain editable while the gateway reconnects.`;
+        ? `${data.statusText} · ${data.canFeed}${locationText ? ` · ${locationText}` : ''} · updated ${age}s ago`
+        : `Last packet ${age}s ago${locationText ? ` · last location: ${locationText}` : ''}. The fleet sample records remain editable while the gateway reconnects.`;
     }
     document.getElementById('fleet-device-rpm').textContent = data.rpm > 0 ? `${Math.round(data.rpm).toLocaleString('en-US')}` : '--';
     document.getElementById('fleet-device-coolant').textContent = data.coolant > 0 ? `${data.coolant.toFixed(1)}°C` : '--';
@@ -1732,10 +1803,12 @@ function updateFleetLive() {
         ? '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Live telemetry is coming from the ESP32 gateway. Sample fleet records remain editable below.'
         : '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Showing the last ESP32 packet plus the editable sample fleet records.';
     }
+    updateLiveMapPin(data.location);
     return;
   }
 
   card.dataset.state = 'offline';
+  updateLiveMapPin(null);
   document.getElementById('fleet-device-rpm').textContent = '--';
   document.getElementById('fleet-device-coolant').textContent = '--';
   document.getElementById('fleet-device-battery').textContent = '--';
@@ -1752,7 +1825,7 @@ function updateFleetLive() {
 
   if (status && status.connected) {
     if (title) title.textContent = 'Waiting for KA-TRUCK-001';
-    if (sub) sub.textContent = 'Connected to HiveMQ. The live gateway will update this banner when its next packet arrives.';
+    if (sub) sub.textContent = 'Connected to EMQX. The live gateway will update this banner when its next packet arrives.';
     setChip('quiet', 'Waiting');
   } else {
     if (title) title.textContent = 'Waiting for KA-TRUCK-001';

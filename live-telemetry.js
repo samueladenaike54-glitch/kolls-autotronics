@@ -155,6 +155,45 @@
     }
   }
 
+  function normaliseLocation(value) {
+    if (!value || typeof value !== 'object') return null;
+
+    const source = String(value.source || 'none').toLowerCase();
+    const lat = toNumber(value.lat, null);
+    const lon = toNumber(value.lon, null);
+    const hasCoords = lat !== null && lon !== null
+      && Math.abs(lat) <= 90
+      && Math.abs(lon) <= 180;
+
+    return {
+      source: ['ip', 'app', 'gps'].includes(source) ? source : 'none',
+      lat: hasCoords ? lat : null,
+      lon: hasCoords ? lon : null,
+      city: value.city ? String(value.city) : '',
+      country: value.country ? String(value.country) : '',
+      speedKmh: toNumber(value.speed_kmh, 0),
+      altM: toNumber(value.alt_m, 0),
+      sats: Math.max(0, Math.round(toNumber(value.sats, 0))),
+      fix: clamp(Math.round(toNumber(value.fix, 0)), 0, 2),
+      ageS: Math.max(0, Math.round(toNumber(value.age_s, 0)))
+    };
+  }
+
+  function locationRank(location) {
+    if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lon)) return -1;
+    if (location.source === 'app' || location.source === 'gps') {
+      return location.fix > 0 ? 4 : 1;
+    }
+    if (location.source === 'ip') return 2;
+    return 1;
+  }
+
+  function bestLocation(appLocation, rawLocation) {
+    if (!appLocation) return rawLocation || null;
+    if (!rawLocation) return appLocation;
+    return locationRank(rawLocation) > locationRank(appLocation) ? rawLocation : appLocation;
+  }
+
   function normaliseRaw(raw) {
     if (!raw || typeof raw !== 'object') return null;
 
@@ -178,8 +217,9 @@
     const load = toNumber(metrics.load_pct ?? metrics.engine_load ?? raw.engine_load, null);
     const deviceV = toNumber(metrics.device_v, null);
     const devicePct = toNumber(metrics.device_pct, null);
+    const hasLocation = Boolean(raw.location && typeof raw.location === 'object');
 
-    if (coolant === null && battery === null && !rpm) return null;
+    if (coolant === null && battery === null && !rpm && !hasLocation) return null;
 
     return {
       packetType: 'telemetry',
@@ -212,6 +252,7 @@
       obdDetached: toBoolean(diagnostics.obd_detached ?? raw.obd_detached),
       disconnectCount: toNumber(diagnostics.disconnect_count, 0),
       deviceLow: toBoolean(diagnostics.device_low ?? raw.device_low),
+      location: normaliseLocation(raw.location),
       receivedAt: now()
     };
   }
@@ -225,8 +266,9 @@
     const coolant = toNumber(raw.coolant, null);
     const battery = toNumber(raw.battery, null);
     const rpm = toNumber(raw.rpm, 0);
+    const hasLocation = Boolean(raw.location && typeof raw.location === 'object');
 
-    if (score === null && coolant === null && battery === null && !rpm) return null;
+    if (score === null && coolant === null && battery === null && !rpm && !hasLocation) return null;
 
     const systemValue = (key) => {
       const value = toNumber(systems[key], null);
@@ -262,6 +304,7 @@
       canFeed: String(gateway.can_feed || 'UNKNOWN'),
       fwVersion: String(gateway.fw_version || '1.0'),
       tiresAvailable: gateway.tires_available !== undefined ? Boolean(gateway.tires_available) : false,
+      location: normaliseLocation(raw.location),
       load: null,
       stft: null,
       ltft: null,
@@ -313,6 +356,7 @@
       canFeed: app.canFeed && app.canFeed !== 'UNKNOWN' ? app.canFeed : raw.canFeed || 'UNKNOWN',
       fwVersion: app.fwVersion && app.fwVersion !== '1.0' ? app.fwVersion : raw.fwVersion || app.fwVersion || '1.0',
       tiresAvailable: app.tiresAvailable !== undefined ? app.tiresAvailable : false,
+      location: bestLocation(app.location, raw.location),
       receivedAt: now()
     };
   }
@@ -393,6 +437,44 @@
       emit('command-sent', { command: clean, topic: commandTopic() });
     });
     return true;
+  }
+
+  function publishJson(payload, label) {
+    if (!payload || !client || !state.connected) return false;
+
+    client.publish(commandTopic(), JSON.stringify(payload), { qos: 1, retain: false }, (error) => {
+      if (error) {
+        state.error = `Command failed: ${error.message || error}`;
+        emit('error');
+        return;
+      }
+      emit('command-sent', { command: label || payload.action || 'COMMAND', topic: commandTopic() });
+    });
+    return true;
+  }
+
+  function sendLocation(location) {
+    const source = location && typeof location === 'object' ? location : {};
+    const lat = toNumber(source.lat, null);
+    const lon = toNumber(source.lon, null);
+    if (lat === null || lon === null || Math.abs(lat) > 90 || Math.abs(lon) > 180) return false;
+
+    const payload = {
+      action: 'location',
+      lat: Number(lat.toFixed(6)),
+      lon: Number(lon.toFixed(6)),
+      sats: Math.max(0, Math.round(toNumber(source.sats, 0))),
+      fix: toNumber(source.fix, 1) === 2 ? 2 : 1
+    };
+
+    const speed = toNumber(source.speedKmh, null);
+    if (speed !== null) payload.speed = Number(speed.toFixed(1));
+
+    const alt = toNumber(source.altM, null);
+    if (alt !== null) payload.alt = Number(alt.toFixed(1));
+
+    state.lastCommand = 'LOCATION';
+    return publishJson(payload, 'LOCATION');
   }
 
   function startWatchdog() {
@@ -710,6 +792,7 @@
     setGateway,
     gatewayUrl,
     sendCommand,
+    sendLocation,
     status,
     healthyScore,
     on(listener) {
