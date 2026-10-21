@@ -1,0 +1,139 @@
+<svg viewBox="0 0 1100 620" width="1100" height="620" xmlns="http://www.w3.org/2000/svg">
+<style>
+  :root {
+    --bg: #0b1220; --card: #162033; --border: #334155; --fg: #e5e7eb; --muted: #94a3b8;
+    --power: #ef4444; --gnd: #cbd5e1; --can-h: #f59e0b; --can-l: #3b82f6;
+    --spi: #a78bfa; --data: #10b981; --unused: #64748b; --cut: #ef4444; --brand: #22d3ee;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; }
+  header { text-align: center; margin-bottom: 8px; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; color: var(--brand); }
+  h2 { font-size: 1.05rem; margin: 26px 0 8px; color: var(--brand); }
+  .sub { color: var(--muted); font-size: .9rem; }
+  svg { width: 100%; max-width: 1080px; display: block; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+  .comp { fill: #1e293b; stroke: var(--border); stroke-width: 2; rx: 8; }
+  .wire { fill: none; stroke-width: 2.5; }
+  text  { fill: var(--fg); font-family: ui-monospace, monospace; }
+  .lbl  { font-size: 12px; font-weight: 700; }
+  .pin  { font-size: 10px; fill: var(--muted); }
+  .note { font-size: 10px; fill: var(--muted); }
+  .cutx { stroke: var(--cut); stroke-width: 2.5; }
+  table { width: 100%; max-width: 1080px; margin: 10px auto 0; border-collapse: collapse; font-size: .82rem; }
+  th, td { border: 1px solid var(--border); padding: 5px 9px; text-align: left; }
+  th { background: #1e293b; color: var(--brand); }
+  .ok { color: #4ade80; } .warn { color: #fbbf24; } .crit { color: #f87171; }
+  ul.check { max-width: 1080px; margin: 10px auto; font-size: .85rem; color: var(--muted); line-height: 1.75; }
+
+text{font-family:ui-monospace,Consolas,monospace}</style>
+
+  <!-- OBD -->
+  <rect class="comp" x="20" y="170" width="170" height="230" stroke="#f59e0b"/>
+  <text class="lbl" x="105" y="195" text-anchor="middle" fill="#f59e0b">OBD-II J1962</text>
+  <text class="pin" x="30" y="232" fill="#f59e0b">Pin 6  · CAN High</text>
+  <text class="pin" x="30" y="272" fill="#3b82f6">Pin 14 · CAN Low</text>
+  <text class="pin" x="30" y="332" fill="#cbd5e1">Pin 4/5 · GND</text>
+  <text class="pin" x="30" y="372" fill="#64748b">Pin 16 · +12V UNUSED</text>
+  <circle cx="190" cy="228" r="4.5" fill="#f59e0b"/>
+  <circle cx="190" cy="268" r="4.5" fill="#3b82f6"/>
+  <circle cx="190" cy="328" r="4.5" fill="#cbd5e1"/>
+  <circle cx="190" cy="368" r="4.5" fill="#64748b"/>
+
+  <!-- PCA82C250 -->
+  <rect x="360" y="200" width="180" height="210" fill="#0f172a" stroke="#22d3ee"/>
+  <text class="lbl" x="450" y="222" text-anchor="middle" fill="#22d3ee">PCA82C250</text>
+  <text class="note" x="450" y="236" text-anchor="middle" fill="#f87171">5 V TRANSCEIVER</text>
+  <text class="note" x="450" y="249" text-anchor="middle" fill="#64748b">VCC = 5 V (4.5-5.5 V)</text>
+  <circle cx="368" cy="206" r="2.5" fill="#e5e7eb"/>
+  <text class="pin" x="368" y="278">1 TXD</text>
+  <text class="pin" x="368" y="318">2 GND</text>
+  <text class="pin" x="368" y="358">3 VCC</text>
+  <text class="pin" x="368" y="398">4 RXD</text>
+  <circle cx="360" cy="274" r="4" fill="#10b981"/>
+  <circle cx="360" cy="314" r="4" fill="#cbd5e1"/>
+  <circle cx="360" cy="354" r="4" fill="#ef4444"/>
+  <circle cx="360" cy="394" r="4" fill="#a78bfa"/>
+  <text class="pin" x="534" y="278" text-anchor="end">8 RS → GND</text>
+  <text class="pin" x="534" y="318" text-anchor="end">7 CANH</text>
+  <text class="pin" x="534" y="358" text-anchor="end">6 CANL</text>
+  <text class="pin" x="534" y="398" text-anchor="end">5 VREF (open)</text>
+  <circle cx="540" cy="274" r="4" fill="#cbd5e1"/>
+  <circle cx="540" cy="314" r="4" fill="#f59e0b"/>
+  <circle cx="540" cy="354" r="4" fill="#3b82f6"/>
+  <circle cx="540" cy="394" r="4" fill="#94a3b8"/>
+
+  <!-- level divider block : 3 x 1k (1k from RXD, 2k to GND) = 5V x 2/3 = 3.33V -->
+  <rect x="700" y="230" width="200" height="180" fill="#1a1024" stroke="#f87171"/>
+  <text class="lbl" x="800" y="252" text-anchor="middle" fill="#f87171">LEVEL DIVIDER</text>
+  <text class="note" x="800" y="268" text-anchor="middle" fill="#94a3b8">RXD 5 V → ESP32 3.3 V</text>
+  <rect x="730" y="286" width="70" height="24" fill="#1e293b" stroke="#fbbf24"/>
+  <text class="pin" x="765" y="302" text-anchor="middle" fill="#fbbf24">1k</text>
+  <rect x="730" y="330" width="70" height="24" fill="#1e293b" stroke="#fbbf24"/>
+  <text class="pin" x="765" y="346" text-anchor="middle" fill="#fbbf24">1k</text>
+  <rect x="730" y="374" width="70" height="24" fill="#1e293b" stroke="#fbbf24"/>
+  <text class="pin" x="765" y="390" text-anchor="middle" fill="#fbbf24">1k</text>
+  <text class="note" x="800" y="412" text-anchor="middle" fill="#94a3b8">5 V × 2/3 = 3.33 V</text>
+  <circle cx="765" cy="318" r="4" fill="#fbbf24"/>
+  <circle cx="765" cy="362" r="4" fill="#fbbf24"/>
+
+  <!-- ESP32 -->
+  <rect class="comp" x="940" y="170" width="140" height="270" stroke="#10b981"/>
+  <text class="lbl" x="1010" y="195" text-anchor="middle" fill="#10b981">ESP32</text>
+  <text class="pin" x="946" y="252">GPIO5 · TX</text>
+  <text class="pin" x="946" y="300">GPIO4 · RX</text>
+  <text class="pin" x="946" y="348">3V3 / GND</text>
+  <circle cx="940" cy="248" r="4" fill="#10b981"/>
+  <circle cx="940" cy="296" r="4" fill="#a78bfa"/>
+  <circle cx="940" cy="344" r="4" fill="#f97316"/>
+
+  <!-- 5V rail -->
+  <rect class="comp" x="360" y="470" width="180" height="56" stroke="#ef4444"/>
+  <text class="lbl" x="450" y="493" text-anchor="middle" fill="#ef4444">5 V RAIL</text>
+  <text class="pin" x="450" y="512" text-anchor="middle">from buck / boost</text>
+  <circle cx="360" cy="498" r="4.5" fill="#ef4444"/>
+  <path class="wire" d="M360 498 H330 V354 H360" stroke="#ef4444"/>
+  <text class="note" x="215" y="500" fill="#ef4444">VCC ← 5 V (NOT 3.3 V)</text>
+  <text class="note" x="180" y="440" fill="#94a3b8">add 100 nF at VCC pin</text>
+
+  <!-- GND bus -->
+  <line class="wire" x1="40" y1="560" x2="1060" y2="560" stroke="#cbd5e1" stroke-width="3" stroke-dasharray="10,5"/>
+  <text class="pin" x="40" y="582" fill="#94a3b8">GND: OBD 4/5 · transceiver pin 2 · RS pin 8 · R2 bottom · ESP32 GND</text>
+  <path class="wire" d="M190 328 H232 V560" stroke="#cbd5e1" stroke-dasharray="6,3"/>
+  <path class="wire" d="M360 314 H330 V560" stroke="#cbd5e1" stroke-dasharray="6,3"/>
+  <path class="wire" d="M540 274 H566 V560" stroke="#cbd5e1" stroke-dasharray="6,3"/>
+  <path class="wire" d="M765 366 V560" stroke="#cbd5e1" stroke-dasharray="6,3"/>
+  <path class="wire" d="M940 344 H906 V560" stroke="#cbd5e1" stroke-dasharray="6,3"/>
+
+  <!-- CAN -->
+  <path class="wire" d="M190 228 H270 V314 H356" stroke="#f59e0b"/>
+  <text class="note" x="196" y="220" fill="#f59e0b">CAN-H (OBD 6 → pin 7)</text>
+  <path class="wire" d="M190 268 H280 V354 H356" stroke="#3b82f6"/>
+  <text class="note" x="196" y="260" fill="#3b82f6">CAN-L (OBD 14 → pin 6)</text>
+
+  <!-- TXD from ESP -->
+  <path class="wire" d="M360 274 H300 V170 H926 V248 H940" stroke="#10b981"/>
+  <text class="note" x="480" y="162" fill="#10b981">TXD (pin 1) ← ESP32 GPIO5 (3.3 V logic OK)</text>
+
+  <!-- RXD divider : exits LEFT from pin 4, routed under the chip -->
+  <path class="wire" d="M360 394 H348 V430 H660 V301 H730" stroke="#a78bfa"/>
+  <path class="wire" d="M800 301 H880 V296 H936" stroke="#a78bfa"/>
+  <text class="note" x="370" y="448" fill="#a78bfa">RXD (pin 4) → divider → GPIO4</text>
+  <text class="note" x="370" y="461" fill="#f87171">NEVER connect 5 V RXD direct to GPIO4</text>
+
+  <!-- termination : DO NOT FIT -->
+  <g stroke="#ef4444" stroke-width="2.5" fill="none">
+    <rect x="556" y="306" width="46" height="40"/>
+    <line x1="556" y1="316" x2="602" y2="336"/>
+    <line x1="556" y1="336" x2="602" y2="316"/>
+  </g>
+  <text class="note" x="610" y="322" fill="#ef4444">120 Ω - DO NOT FIT</text>
+  <text class="note" x="610" y="335" fill="#f87171">car has 2 already</text>
+
+  <!-- warning box -->
+  <rect x="620" y="430" width="460" height="110" fill="#1a1024" stroke="#f87171"/>
+  <text class="lbl" x="640" y="452" fill="#f87171">⚠ 5 V PART — DIFFERENT FROM THE HVD230</text>
+  <text class="pin" x="640" y="472" fill="#e5e7eb">1. VCC = 5 V rail. Feeding 3.3 V gives a dead transceiver.</text>
+  <text class="pin" x="640" y="490" fill="#e5e7eb">2. RXD swings 5 V → MUST use the 1k / 1k / 1k divider into GPIO4.</text>
+  <text class="pin" x="640" y="508" fill="#e5e7eb">3. RS (pin 8) MUST be low (GND) or the receiver goes high-Z.</text>
+  <text class="pin" x="640" y="526" fill="#e5e7eb">4. DO NOT fit a 120 Ω across pins 6/7 — the car already has 2.</text>
+</svg>

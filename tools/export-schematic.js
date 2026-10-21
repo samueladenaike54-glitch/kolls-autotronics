@@ -18,17 +18,28 @@ const svgs = [...html.matchAll(/<svg viewBox="([^"]+)"[\s\S]*?<\/svg>/g)].map(m 
   viewBox: m[1],
   markup: m[0]
 }));
-if (svgs.length !== 2) {
-  console.error('Expected 2 SVG sheets, found ' + svgs.length);
+if (svgs.length < 2) {
+  console.error('Expected at least 2 SVG sheets, found ' + svgs.length);
   process.exit(1);
 }
-const names = ['schematic-signals-can', 'schematic-power-divider'];
+const names = ['schematic-signals-can', 'schematic-power-divider', 'schematic-pca82c250'];
 
 /* ------------------------------------------------------------------ build SVG */
 svgs.forEach((s, i) => {
   const [, , vw, vh] = s.viewBox.split(/\s+/).map(Number);
+  // Tag-balance guard: an unclosed element silently truncates the render.
+  ['g', 'svg', 'text', 'style'].forEach(t => {
+    const o = (s.markup.match(new RegExp('<' + t + '[ >]', 'g')) || []).length;
+    const c = (s.markup.match(new RegExp('</' + t + '>', 'g')) || []).length;
+    if (o !== c) {
+      console.error(`ERROR: sheet ${i + 1} has ${o} <${t}> but ${c} </${t}> - fix the markup`);
+      process.exit(1);
+    }
+  });
   const standalone = s.markup
-    .replace(/<svg viewBox="([^"]+)"/, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="$1" width="${vw}" height="${vh}"`)
+    // NB: do NOT add an xmlns attribute - the source already has one and a
+    // duplicate attribute is a fatal XML error in a standalone .svg file.
+    .replace(/<svg viewBox="([^"]+)"/, `<svg viewBox="$1" width="${vw}" height="${vh}"`)
     .replace(/(<svg[^>]*>)/, `$1\n<style>${css}\ntext{font-family:ui-monospace,Consolas,monospace}</style>`);
   fs.writeFileSync(path.join(OUT, `${names[i]}.svg`), standalone, 'utf8');
   console.log(`sheet ${i + 1}: ${vw}x${vh} -> images/${names[i]}.svg`);
@@ -148,6 +159,8 @@ function render(file, outPng, width, height, scale) {
 
 svgs.forEach((s, i) => {
   const [, , vw, vh] = s.viewBox.split(/\s+/).map(Number);
+  // Render via a minimal HTML wrapper (Chrome renders standalone .svg files
+  // inconsistently; the wrapper is deterministic).
   const wrap = path.join(OUT, `_wrap_${names[i]}.html`);
   fs.writeFileSync(wrap, `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>html,body{margin:0;padding:0;background:#162033}svg{display:block}</style></head>

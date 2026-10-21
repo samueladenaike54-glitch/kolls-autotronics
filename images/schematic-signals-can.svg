@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 700" width="1100" height="700" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 1100 700" width="1100" height="700" xmlns="http://www.w3.org/2000/svg">
 <style>
   :root {
     --bg: #0b1220; --card: #162033; --border: #334155; --fg: #e5e7eb; --muted: #94a3b8;
