@@ -290,6 +290,16 @@ function liveAgeSeconds() {
   return Math.max(0, Math.round((Date.now() - STATE.live.receivedAt) / 1000));
 }
 
+function friendlyMode(data) {
+  const text = String(data && data.statusText ? data.statusText : '').trim();
+  if (/BENCH|SIM/i.test(text)) return 'Demo mode';
+  if (data && data.obdDetached) return 'Check vehicle';
+  if (data && data.severity >= 2) return 'Alert';
+  if (data && data.severity === 1) return 'Warning';
+  if (/NOMINAL|OK|ONLINE|CONNECTED/i.test(text)) return 'Connected';
+  return text || 'Connected';
+}
+
 function liveTone(data) {
   if (!data) return 'quiet';
   if (data.tone === 'danger' || data.tone === 'warn' || data.tone === 'good') return data.tone;
@@ -373,15 +383,15 @@ function getSummary() {
   const live = getLiveData();
   if (live) {
     if (live.tamper || live.obdDetached) {
-      return `The ESP32 reports ${live.statusText}. The OBD feed was interrupted, so check the gateway connection before relying on live readings.`;
+      return `Orion X reports ${friendlyMode(live)}. The vehicle connection was interrupted, so check Orion X before relying on live readings.`;
     }
     if (live.severity === 2) {
-      return `The ESP32 reports ${live.statusText}. Coolant is ${live.coolant.toFixed(1)}°C and system voltage is ${live.battery.toFixed(2)} V. Stop safely and inspect the vehicle.`;
+      return `Orion X reports ${friendlyMode(live)}. Coolant is ${live.coolant.toFixed(1)}°C and system voltage is ${live.battery.toFixed(2)} V. Stop safely and inspect the vehicle.`;
     }
     if (live.severity === 1) {
-      return `The ESP32 reports ${live.statusText}. Coolant is ${live.coolant.toFixed(1)}°C and system voltage is ${live.battery.toFixed(2)} V. Plan a check soon.`;
+      return `Orion X reports ${friendlyMode(live)}. Coolant is ${live.coolant.toFixed(1)}°C and system voltage is ${live.battery.toFixed(2)} V. Plan a check soon.`;
     }
-    return `ESP32 live feed: coolant ${live.coolant.toFixed(1)}°C, oil ${live.oil.toFixed(1)}°C and system voltage ${live.battery.toFixed(2)} V. No warning flags in the current packet.`;
+    return `Orion X is connected. Coolant ${live.coolant.toFixed(1)}°C, oil ${live.oil.toFixed(1)}°C and system voltage ${live.battery.toFixed(2)} V. No warning flags in the current reading.`;
   }
 
   const open = getOpenRepairs();
@@ -408,7 +418,7 @@ function getCoolingInfo() {
       return {
         value: liveCooling,
         label: 'Critical',
-        description: `ESP32 reports ${live.coolant.toFixed(1)}°C coolant`,
+        description: `Orion X reports ${live.coolant.toFixed(1)}°C coolant`,
         tone: 'danger'
       };
     }
@@ -416,14 +426,14 @@ function getCoolingInfo() {
       return {
         value: liveCooling,
         label: 'Watch',
-        description: `ESP32 reports ${live.coolant.toFixed(1)}°C coolant`,
+        description: `Orion X reports ${live.coolant.toFixed(1)}°C coolant`,
         tone: 'warn'
       };
     }
     return {
       value: liveCooling,
       label: 'Good',
-      description: `ESP32 reports ${live.coolant.toFixed(1)}°C coolant`,
+      description: `Orion X reports ${live.coolant.toFixed(1)}°C coolant`,
       tone: 'good'
     };
   }
@@ -704,7 +714,6 @@ function renderHealth() {
   renderSystems();
   renderCooling();
   renderTires();
-  renderLocation();
   renderConnection(copy.tone);
   renderAiModel();
   renderLiveDevice();
@@ -715,7 +724,7 @@ function renderConnection(tone) {
   setDot('connection-dot', tone);
 
   const text = isLiveFresh()
-    ? 'ESP32 live feed'
+    ? 'Orion X connected'
     : tone === 'danger'
       ? 'Attention detected'
       : tone === 'warn'
@@ -765,13 +774,13 @@ function renderVitals() {
   setVitalTone('val-temp', coolantTone);
 
   setDot('range-dot', 'neutral');
-  setText('range-status-text', liveRange ? `${Math.round(fuel)}% · ESP32 live` : isLiveFresh() ? 'Garage estimate' : `${fuel}% tank`);
+  setText('range-status-text', liveRange ? `${Math.round(fuel)}% · Live` : isLiveFresh() ? 'Garage estimate' : `${fuel}% tank`);
   setVitalTone('val-range', 'neutral');
 }
 
 function renderSystems() {
   const systems = getSystems();
-  setText('systems-sub', isLiveFresh() ? 'Live engine telemetry from the ESP32 gateway' : 'Live diagnostics from your vehicle');
+  setText('systems-sub', isLiveFresh() ? 'Live vehicle data from Orion X' : 'Live diagnostics from your vehicle');
 
   $$('[data-system-value]').forEach((element) => {
     const key = element.dataset.systemValue;
@@ -844,7 +853,7 @@ function renderTires() {
   const footnote = document.getElementById('tpms-footnote');
   if (footnote) {
     footnote.innerHTML = isLiveFresh()
-      ? '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> TPMS is not on the ESP32 CAN feed; values are a garage estimate.'
+      ? '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Tire sensors are not connected; values are a garage estimate.'
       : '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Pressure checked 2 minutes ago';
   }
 }
@@ -860,7 +869,7 @@ function locationSourceView(location) {
       chip: 'Fix expired',
       tone: 'warn',
       fix: 'Expired',
-      long: source === 'app' ? 'phone GPS fix' : 'ESP32 GPS fix'
+      long: source === 'app' ? 'phone GPS fix' : 'Orion X GPS fix'
     };
   }
   if (source === 'app') {
@@ -876,7 +885,7 @@ function locationSourceView(location) {
       chip: 'GPS fix',
       tone: fix > 0 ? 'good' : 'warn',
       fix: fix === 2 ? 'DGPS fix' : fix === 1 ? 'GPS fix' : 'No fix',
-      long: fix > 0 ? 'ESP32 GPS fix' : 'ESP32 location without a fix'
+      long: fix > 0 ? 'Orion X GPS fix' : 'Orion X location without a fix'
     };
   }
   if (source === 'ip') {
@@ -934,19 +943,19 @@ function renderLocation() {
   const sourceChip = document.getElementById('location-source-chip');
   if (sourceChip) sourceChip.className = `chip chip--${view.tone}`;
 
-  let subtitle = 'Waiting for the ESP32 location feed';
+  let subtitle = 'Waiting for the Orion X location feed';
   if (data && !location) {
-    subtitle = 'The current ESP32 packet did not include location data.';
+    subtitle = 'The current Orion X packet did not include location data.';
   } else if (location && !hasCoords) {
-    subtitle = 'The ESP32 has not resolved a position yet.';
+    subtitle = 'The Orion X has not resolved a position yet.';
   } else if (location && location.source === 'ip') {
-    subtitle = 'City-level estimate from the ESP32 — not a GPS fix.';
+    subtitle = 'City-level estimate from the Orion X — not a GPS fix.';
   } else if (expired) {
-    subtitle = `The last ${view.long} has expired; the ESP32 will fall back to IP level.`;
+    subtitle = `The last ${view.long} has expired; the Orion X will fall back to IP level.`;
   } else if (location && location.fix > 0) {
-    subtitle = `Real ${view.long} from the ESP32.`;
+    subtitle = `Real ${view.long} from the Orion X.`;
   } else if (location) {
-    subtitle = `The ESP32 reports ${view.long}; no satellite fix yet.`;
+    subtitle = `The Orion X reports ${view.long}; no satellite fix yet.`;
   }
   if (data && !fresh) {
     const age = liveAgeSeconds();
@@ -958,10 +967,10 @@ function renderLocation() {
   const hint = document.getElementById('location-hint');
   if (hint) {
     hint.textContent = gatewayMode
-      ? 'Direct HTTP mode is read-only. Use the MQTT feed to push browser GPS to the ESP32.'
+      ? 'Direct HTTP mode is read-only. Use the MQTT feed to push browser GPS to the Orion X.'
       : location && location.source === 'app' && location.fix > 0 && !expired
-        ? 'This fix came from the phone and is echoed by the ESP32. App-pushed fixes expire after 2 minutes.'
-        : 'Browser GPS is sent to the ESP32 over MQTT, then echoed back with source “app”.';
+        ? 'This fix came from the phone and is echoed by the Orion X. App-pushed fixes expire after 2 minutes.'
+        : 'Browser GPS is sent to the Orion X over MQTT, then echoed back with source “app”.';
   }
 
   const button = document.getElementById('location-use-btn');
@@ -1024,13 +1033,13 @@ function useMyLocation() {
       finish();
 
       if (!sent) {
-        showToast('GPS acquired, but the ESP32 is not connected. Start the live feed and try again.', 'warn');
+        showToast('GPS acquired, but the Orion X is not connected. Start the live feed and try again.', 'warn');
         return;
       }
 
       const hint = document.getElementById('location-hint');
-      if (hint) hint.textContent = 'Phone GPS sent. The ESP32 will echo the fix in its next packet.';
-      showToast('Phone GPS sent to the ESP32. Waiting for the echo…', 'good');
+      if (hint) hint.textContent = 'Phone GPS sent. The Orion X will echo the fix in its next packet.';
+      showToast('Phone GPS sent to the Orion X. Waiting for the echo…', 'good');
     },
     (error) => {
       finish();
@@ -1049,14 +1058,74 @@ function useMyLocation() {
   );
 }
 
+let autoLocationWatchId = null;
+let autoLocationLastFix = null;
+let autoLocationLastSent = null;
+let autoLocationLastSentAt = 0;
+let autoLocationNoticeShown = false;
+
+function metresBetween(a, b) {
+  if (!a || !b) return Infinity;
+  const lat = (b.lat - a.lat) * 111320;
+  const lon = (b.lon - a.lon) * 111320 * Math.cos(((a.lat + b.lat) * Math.PI) / 360);
+  return Math.hypot(lat, lon);
+}
+
+function tryPublishAutoLocation(fix, force) {
+  if (!fix || !window.OrionLive || typeof window.OrionLive.sendLocation !== 'function') return false;
+  const now = Date.now();
+  const moved = metresBetween(autoLocationLastSent, fix);
+  if (!force && autoLocationLastSentAt && now - autoLocationLastSentAt < 30000 && moved < 40) return false;
+
+  const sent = window.OrionLive.sendLocation(fix);
+  if (sent) {
+    autoLocationLastSent = { lat: fix.lat, lon: fix.lon };
+    autoLocationLastSentAt = now;
+  }
+  return sent;
+}
+
+function handleAutoLocation(position) {
+  if (!position || !position.coords) return;
+  const coords = position.coords;
+  if (!Number.isFinite(coords.latitude) || !Number.isFinite(coords.longitude)) return;
+
+  autoLocationLastFix = {
+    lat: coords.latitude,
+    lon: coords.longitude,
+    sats: 0,
+    fix: 1,
+    speedKmh: Number.isFinite(coords.speed) ? coords.speed * 3.6 : null,
+    altM: Number.isFinite(coords.altitude) ? coords.altitude : null
+  };
+  tryPublishAutoLocation(autoLocationLastFix, false);
+}
+
+function handleAutoLocationError(error) {
+  if (autoLocationNoticeShown) return;
+  autoLocationNoticeShown = true;
+  if (error && error.code === 1) {
+    showToast('Turn on location access to show this vehicle on the live map.', 'warn');
+  }
+}
+
+function startAutoLocation() {
+  if (autoLocationWatchId !== null || !navigator.geolocation) return;
+  const options = { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 };
+  navigator.geolocation.getCurrentPosition(handleAutoLocation, handleAutoLocationError, options);
+  autoLocationWatchId = navigator.geolocation.watchPosition(handleAutoLocation, handleAutoLocationError, options);
+}
+
 function renderLastScan() {
   if (isLiveFresh()) {
     const age = liveAgeSeconds();
-    setText('last-scan', `ESP32 live · ${age}s ago`);
+    setText('last-scan', `Orion X connected · ${age}s ago`);
+    setText('connect-esp32-label', 'Orion X connected');
     return;
   }
 
-  const label = STATE.demo ? 'Simulated just now' : `Updated ${formatTime(new Date(STATE.lastScan))}`;
+  setText('connect-esp32-label', 'Connect Orion X');
+  const label = STATE.demo ? 'Demo data just now' : `Updated ${formatTime(new Date(STATE.lastScan))}`;
   setText('last-scan', label);
 }
 
@@ -1106,20 +1175,20 @@ function renderLiveDevice() {
     setText('device-pack', data.deviceV > 0 ? `${data.deviceV.toFixed(2)} V · ${data.devicePct}%` : '--');
     setText(
       'device-trims',
-      `STFT ${signedNumber(data.stft)}% · LTFT ${signedNumber(data.ltft)}% · IAT ${data.iat.toFixed(1)}°C · ${data.statusText}`
+      `Live readings · ${friendlyMode(data)}`
     );
-    setText('device-meta', fresh ? `Updated ${age}s ago · ${data.canFeed} · ${data.statusText}` : `Last packet ${age}s ago · waiting for the next one`);
-    setText('device-subtitle', fresh ? `${data.vehicleId} · ${data.canFeed} · firmware ${data.fwVersion}` : `${data.vehicleId} · last packet ${age}s ago`);
+    setText('device-meta', fresh ? `Updated ${age}s ago · ${friendlyMode(data)}` : `Last reading ${age}s ago`);
+    setText('device-subtitle', fresh ? 'Orion X connected' : `Last reading ${age}s ago`);
     setDeviceButtons(Boolean(status && status.connected));
 
     if (fresh) {
       tone = liveTone(data);
       chipText = tone === 'danger' ? 'Alert' : tone === 'warn' ? 'Warning' : 'Live';
-      setBadge('is-live', 'ESP32 live');
+      setBadge('is-live', 'Orion X connected');
     } else {
       tone = 'warn';
       chipText = 'Stale';
-      setBadge('is-connecting', gatewayMode ? 'ESP32 offline' : 'EMQX stale');
+      setBadge('is-connecting', 'Orion X offline');
     }
   } else {
     setText('device-rpm', '--');
@@ -1135,40 +1204,40 @@ function renderLiveDevice() {
       tone = 'quiet';
       chipText = 'Connecting';
       setBadge('is-demo', 'Demo mode');
-      setText('device-subtitle', 'Waiting for the KA-TRUCK-001 gateway.');
-      setText('device-meta', 'Direct HTTP · /telemetry');
+      setText('device-subtitle', 'Waiting for Orion X.');
+      setText('device-meta', 'Live vehicle data');
     } else if (status.status === 'connecting' || status.status === 'reconnecting') {
       tone = 'quiet';
       chipText = 'Connecting';
-      setBadge('is-connecting', gatewayMode ? 'Direct connect' : 'EMQX connecting');
-      setText('device-subtitle', gatewayMode ? `Connecting directly to ${status.gatewayUrl}.` : `Connecting to ${status.brokerUrl}.`);
-      setText('device-meta', gatewayMode ? 'Direct HTTP · /telemetry' : 'EMQX · kolls/vehicle/telemetry');
+      setBadge('is-connecting', 'Connecting to Orion X');
+      setText('device-subtitle', 'Connecting to Orion X…');
+      setText('device-meta', 'Live vehicle data');
     } else if (gatewayMode && status.connected && !status.gatewayConnected) {
       tone = 'quiet';
       chipText = 'Offline';
-      setBadge('is-offline', 'ESP32 offline');
-      setText('device-subtitle', status.gatewayError || `No reply from ${status.gatewayUrl}. Check the IP on the TFT NET page.`);
-      setText('device-meta', `Direct HTTP · ${status.gatewayUrl}`);
+      setBadge('is-offline', 'Orion X offline');
+      setText('device-subtitle', 'No reply from Orion X.');
+      setText('device-meta', 'Check that Orion X is on');
       setDeviceButtons(false);
     } else if (status.connected) {
       tone = 'quiet';
       chipText = 'Waiting';
-      setBadge('is-connecting', gatewayMode ? 'Direct · waiting' : 'EMQX waiting');
-      setText('device-subtitle', gatewayMode ? `Connected to ${status.gatewayUrl}. Waiting for telemetry...` : `Connected to EMQX. Waiting for ${status.vehicleId} telemetry...`);
-      setText('device-meta', gatewayMode ? 'Direct HTTP · /telemetry' : `Live broker · ${status.topic}`);
+      setBadge('is-connecting', 'Waiting for Orion X');
+      setText('device-subtitle', 'Connected. Waiting for live vehicle data…');
+      setText('device-meta', 'Live vehicle data');
     } else if (status.status === 'unavailable' || status.status === 'error' || status.status === 'offline') {
       tone = 'quiet';
       chipText = 'Offline';
-      setBadge('is-offline', gatewayMode ? 'ESP32 offline' : 'EMQX offline');
-      setText('device-subtitle', status.error || (gatewayMode ? `No reply from ${status.gatewayUrl}.` : 'EMQX is unreachable. Check internet on this phone and the ESP32.'));
-      setText('device-meta', gatewayMode ? `Direct HTTP · ${status.gatewayUrl}` : `EMQX · ${status.brokerUrl}`);
+      setBadge('is-offline', 'Orion X offline');
+      setText('device-subtitle', 'Orion X is offline. Check that it is on and online.');
+      setText('device-meta', 'Live vehicle data');
       setDeviceButtons(false);
     } else {
       tone = 'quiet';
       chipText = 'Waiting';
-      setBadge('is-connecting', gatewayMode ? 'Direct · waiting' : 'ESP32 waiting');
-      setText('device-subtitle', `Waiting for ${status.vehicleId || 'KA-TRUCK-001'} telemetry...`);
-      setText('device-meta', gatewayMode ? `Direct HTTP · ${status.gatewayUrl}` : `Live broker · ${status.topic}`);
+      setBadge('is-connecting', 'Waiting for Orion X');
+      setText('device-subtitle', 'Waiting for Orion X…');
+      setText('device-meta', 'Live vehicle data');
     }
   }
 
@@ -1176,7 +1245,7 @@ function renderLiveDevice() {
     card.dataset.state = tone;
     card.setAttribute(
       'aria-label',
-      `ESP32 device link: ${chipText}. ${data ? `Coolant ${data.coolant.toFixed(1)} degrees Celsius, battery ${data.battery.toFixed(2)} volts.` : 'No telemetry received yet.'}`
+      `Orion X status: ${chipText}. ${data ? `Coolant ${data.coolant.toFixed(1)} degrees Celsius, battery ${data.battery.toFixed(2)} volts.` : 'No live data yet.'}`
     );
   }
 
@@ -1579,21 +1648,21 @@ function runScan() {
 
     if (window.OrionLive && window.OrionLive.status().mode === 'gateway') {
       window.OrionLive.refresh();
-      showToast('Requested a fresh frame from the ESP32 gateway.', 'good');
+      showToast('Refreshing data from Orion X.', 'good');
       return;
     }
 
     if (isLiveFresh() && window.OrionLive) {
       const sent = window.OrionLive.sendCommand('PING');
       showToast(
-        sent ? 'Live packet refreshed. PING sent to the ESP32 gateway.' : 'Live packet refreshed.',
+        sent ? 'Live data refreshed.' : 'Live data refreshed.',
         sent ? 'good' : 'warn'
       );
       return;
     }
 
     showToast(
-      STATE.demo ? 'Scan complete. Simulated readings are still active.' : 'Scan complete. No new fault codes.',
+      STATE.demo ? 'Scan complete. Demo readings are still active.' : 'Scan complete. No new fault codes.',
       STATE.demo ? 'warn' : 'good'
     );
   }, 1000);
@@ -1622,16 +1691,15 @@ function handleLiveEvent(event) {
   }
 
   if (detail.event === 'command-response') {
-    showToast('ESP32 replied PONG — the gateway is online.', 'good');
+    showToast('Orion X is online.', 'good');
     return;
   }
 
   if (detail.event === 'command-sent') {
-    showToast(`${detail.command || 'Command'} sent to the ESP32 gateway.`, 'good');
+    showToast('Orion X received the command.', 'good');
     return;
   }
 
-  renderLocation();
   renderLiveDevice();
 }
 
@@ -1642,7 +1710,13 @@ function initLiveTelemetry() {
   }
 
   window.addEventListener('orion:telemetry', handleLiveEvent);
+  window.OrionLive.on((event) => {
+    if (event.event === 'status' && event.state && event.state.connected && autoLocationLastFix) {
+      tryPublishAutoLocation(autoLocationLastFix, true);
+    }
+  });
   window.OrionLive.start();
+  startAutoLocation();
   renderLiveDevice();
 
   window.setInterval(() => {
@@ -1662,31 +1736,31 @@ function initLiveTelemetry() {
 
 function reconnectDevice() {
   if (!window.OrionLive) {
-    showToast('The MQTT bridge is unavailable.', 'warn');
+    showToast('Orion X is not available.', 'warn');
     return;
   }
 
   window.OrionLive.restart();
   renderLiveDevice();
-  showToast('Reconnecting to the ESP32 gateway…', 'good');
+  showToast('Reconnecting to Orion X…', 'good');
 }
 
 function pingDevice() {
   if (!window.OrionLive || !window.OrionLive.sendCommand('PING')) {
-    showToast('The ESP32 is not connected yet.', 'warn');
+    showToast('Orion X is not connected yet.', 'warn');
     return;
   }
 
-  showToast('PING queued for the ESP32 gateway.', 'good');
+  showToast('Checking Orion X…', 'good');
 }
 
 function resetDeviceTamper() {
   if (!window.OrionLive || !window.OrionLive.sendCommand('RESET_TAMPER')) {
-    showToast('The ESP32 is not connected yet.', 'warn');
+    showToast('Orion X is not connected yet.', 'warn');
     return;
   }
 
-  showToast('RESET_TAMPER queued for the ESP32 gateway.', 'good');
+  showToast('Clearing the vehicle alert…', 'good');
 }
 
 function simulateRepair(id) {
@@ -1719,12 +1793,12 @@ function ensureLiveVehicle(data) {
 
   const fallback = CARS.suv;
   const systems = data.systems || {};
-  const name = data.name || (data.vehicleId ? `ESP32 ${data.vehicleId}` : 'ESP32 live vehicle');
+  const name = data.name || (data.vehicleId ? `Orion X ${data.vehicleId}` : 'Orion X vehicle');
 
   if (!CARS.live) {
     CARS.live = Object.assign({}, fallback, {
       name,
-      shortName: data.vehicleId || 'ESP32 live',
+      shortName: data.vehicleId || 'Orion X',
       baseScore: Number.isFinite(data.score) ? data.score : fallback.baseScore,
       battery: data.battery > 0 ? data.battery : fallback.battery,
       coolant: data.coolant > 0 ? data.coolant : fallback.coolant,
@@ -1741,15 +1815,15 @@ function ensureLiveVehicle(data) {
       cooling: {
         value: Number.isFinite(systems.cooling) ? systems.cooling : fallback.cooling.value,
         label: data.tone === 'danger' ? 'Critical' : data.tone === 'warn' ? 'Watch' : 'Good',
-        description: 'Live reading from the ESP32 gateway',
+        description: 'Live reading from Orion X',
         tone: data.tone === 'danger' ? 'danger' : data.tone === 'warn' ? 'warn' : 'good'
       },
-      summary: 'Live telemetry from the ESP32 gateway over direct HTTP.',
+      summary: 'Live vehicle data from Orion X.',
       repairs: []
     });
   } else {
     CARS.live.name = name;
-    CARS.live.shortName = data.vehicleId || 'ESP32 live';
+    CARS.live.shortName = data.vehicleId || 'Orion X';
     CARS.live.baseScore = Number.isFinite(data.score) ? data.score : CARS.live.baseScore;
     CARS.live.battery = data.battery > 0 ? data.battery : CARS.live.battery;
     CARS.live.coolant = data.coolant > 0 ? data.coolant : CARS.live.coolant;
@@ -1767,7 +1841,7 @@ function ensureLiveVehicle(data) {
   if (item) {
     item.hidden = false;
     setText('garage-live-name', CARS.live.name);
-    setText('garage-live-meta', `${data.vehicleId || 'ESP32'} · direct gateway`);
+    setText('garage-live-meta', `${data.vehicleId || 'Orion X'} · live vehicle`);
   }
 
   return CARS.live;
@@ -1791,13 +1865,13 @@ function useLiveVehicle(data, announce) {
   STATE.lastScan = new Date();
 
   renderAll();
-  if (announce) showToast('ESP32 live — switched to the test vehicle.', 'good');
+  if (announce) showToast('Orion X connected — switched to the live vehicle.', 'good');
   return true;
 }
 
 function connectEsp32() {
   if (!window.OrionLive) {
-    showToast('The live gateway bridge did not load.', 'warn');
+    showToast('Orion X could not connect.', 'warn');
     return;
   }
 
@@ -1817,10 +1891,10 @@ function connectEsp32() {
   if (direct) {
     window.OrionLive.startGateway();
     window.OrionLive.refresh();
-    showToast(`Direct connecting to ${window.OrionLive.gatewayUrl()}. Check the IP on the gateway TFT.`, 'good');
+    showToast('Connecting directly to Orion X…', 'good');
   } else {
     window.OrionLive.startMqtt();
-    showToast('Connecting to EMQX. Phone and ESP32 need internet.', 'good');
+    showToast('Connecting to Orion X…', 'good');
   }
 
   window.setTimeout(() => {
@@ -1828,11 +1902,11 @@ function connectEsp32() {
     if (current.fresh && current.data) {
       STATE.liveVehicleAutoSelected = true;
       useLiveVehicle(current.data, false);
-      showToast('ESP32 live — test vehicle selected.', 'good');
+      showToast('Orion X connected — live vehicle selected.', 'good');
     } else if (direct) {
-      showToast(`No reply from ${window.OrionLive.gatewayUrl()}. Use ?gateway=http://NEW-IP on the app URL.`, 'warn');
+      showToast('No reply from Orion X. Check the device is on and nearby.', 'warn');
     } else {
-      showToast('EMQX has not delivered a packet yet. Check internet and the ESP32 gateway.', 'warn');
+      showToast('Orion X has not connected yet. Check that it is on and online.', 'warn');
     }
   }, 6000);
 }
@@ -1976,8 +2050,8 @@ function buildAiContext() {
   const live = getLiveData();
 
   return {
-    vehicle: live ? `${live.vehicleId} · ESP32 live` : car.name,
-    dataSource: live ? 'ESP32 live telemetry' : 'garage demo estimates',
+    vehicle: live ? `${live.vehicleId} · Orion X` : car.name,
+    dataSource: live ? 'Live vehicle data' : 'garage demo estimates',
     live: live || null,
     score: getDisplayScore(),
     summary: getSummary(),
@@ -2324,7 +2398,45 @@ if (document.readyState === 'loading') {
   init();
 }
 
+function triggerOrionXBuzzer() {
+  const status = window.OrionLive ? window.OrionLive.status() : null;
+  if (!status || !status.connected) {
+    showToast('Orion X is not connected yet.', 'warn');
+    return;
+  }
+
+  const pulse = () => {
+    const button = document.getElementById('buzzer-trigger-btn');
+    if (!button) return;
+    button.classList.add('is-sounding');
+    window.setTimeout(() => button.classList.remove('is-sounding'), 1100);
+  };
+
+  if (status.mode === 'gateway') {
+    fetch(status.gatewayUrl + '/buzzer', { method: 'POST', cache: 'no-store' })
+      .then((response) => {
+        if (!response.ok) throw new Error('No reply');
+        pulse();
+        showToast('Orion X is sounding.', 'good');
+      })
+      .catch(() => showToast('Could not reach Orion X. Try again.', 'warn'));
+    return;
+  }
+
+  const sent = typeof window.OrionLive.sendBuzzer === 'function'
+    ? window.OrionLive.sendBuzzer(900)
+    : window.OrionLive.sendCommand('BUZZER');
+  if (!sent) {
+    showToast('Could not reach Orion X. Try again.', 'warn');
+    return;
+  }
+
+  pulse();
+  showToast('Orion X is sounding.', 'good');
+}
+
 /* Inline handlers in the markup call these functions. */
+window.triggerOrionXBuzzer = triggerOrionXBuzzer;
 window.switchTab = switchTab;
 window.runScan = runScan;
 window.simulateRepair = simulateRepair;

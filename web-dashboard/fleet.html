@@ -14,8 +14,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <link rel="stylesheet" href="styles.css?v=13.4">
-  <link rel="stylesheet" href="fleet.css?v=1.2">
+  <link rel="stylesheet" href="styles.css?v=13.5">
+  <link rel="stylesheet" href="fleet.css?v=1.3">
 </head>
 <body class="fleet-body">
   <svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
@@ -86,7 +86,7 @@
           <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
         </a>
 
-        <p class="fleet-demo-note" id="fleet-data-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Sample telemetry for demonstration. The live ESP32 gateway updates this portal when it connects.</p>
+        <p class="fleet-demo-note" id="fleet-data-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Sample data for demonstration. Orion X updates this portal when it connects.</p>
         <p class="version">Orion Fleet · v1.0</p>
       </div>
     </aside>
@@ -115,6 +115,11 @@
             <input type="search" id="global-vehicle-search" placeholder="Search fleet" autocomplete="off" spellcheck="false">
           </label>
 
+          <button class="btn btn-secondary fleet-buzzer-btn" type="button" id="fleet-buzzer-btn" onclick="triggerOrionXBuzzer()" disabled aria-label="Sound the Orion X buzzer" title="Sound Orion X">
+            <i class="fa-solid fa-volume-high" aria-hidden="true"></i>
+            <span>Sound Orion X</span>
+          </button>
+
           <button class="icon-btn fleet-bell" type="button" onclick="showPage('alerts')" aria-label="Open fleet alerts">
             <i class="fa-solid fa-bell" aria-hidden="true"></i>
             <span class="fleet-bell-badge" id="bell-alert-count">0</span>
@@ -140,7 +145,7 @@
               <p class="page-sub">
                 <span id="overview-date">Tuesday, 20 October</span>
                 <span class="dot-sep" aria-hidden="true">·</span>
-                <span class="fleet-sample-label" id="fleet-sample-label"><span class="status-dot" aria-hidden="true"></span> Sample telemetry</span>
+                <span class="fleet-sample-label" id="fleet-sample-label"><span class="status-dot" aria-hidden="true"></span> Sample data</span>
               </p>
             </div>
             <div class="page-head-actions fleet-head-actions">
@@ -159,9 +164,9 @@
             <div class="fleet-live-device-main">
               <span class="fleet-live-device-icon"><i class="fa-solid fa-microchip" aria-hidden="true"></i></span>
               <div>
-                <p class="eyebrow">ESP32 gateway</p>
-                <h2 id="fleet-device-title">Waiting for KA-TRUCK-001</h2>
-                <p id="fleet-device-sub">Connect the vehicle gateway to stream live OBD-II telemetry into the fleet.</p>
+                <p class="eyebrow">Orion X</p>
+                <h2 id="fleet-device-title">Waiting for Orion X</h2>
+                <p id="fleet-device-sub">Turn on Orion X to see live vehicle data here.</p>
               </div>
             </div>
             <div class="fleet-live-device-metrics">
@@ -736,7 +741,7 @@
   </div>
 
   <script src="mqtt.min.js?v=5.10.4"></script>
-  <script src="live-telemetry.js?v=1.5"></script>
-  <script src="fleet.js?v=1.3"></script>
+  <script src="live-telemetry.js?v=1.6"></script>
+  <script src="fleet.js?v=1.4"></script>
 </body>
 </html>

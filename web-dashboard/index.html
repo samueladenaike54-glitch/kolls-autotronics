@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <link rel="stylesheet" href="styles.css?v=13.4">
+  <link rel="stylesheet" href="styles.css?v=13.5">
 </head>
 <body>
   <svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
@@ -107,6 +107,9 @@
           <a class="icon-btn topbar-fleet-link" href="fleet.html" aria-label="Open fleet portal" title="Fleet portal">
             <i class="fa-solid fa-building-columns" aria-hidden="true"></i>
           </a>
+          <button class="icon-btn topbar-buzzer" type="button" id="buzzer-trigger-btn" onclick="triggerOrionXBuzzer()" aria-label="Sound Orion X" title="Sound Orion X">
+            <i class="fa-solid fa-volume-high" aria-hidden="true"></i>
+          </button>
           <button class="icon-btn topbar-demo" type="button" onclick="openSimModal()" aria-haspopup="dialog" aria-label="Open demo lab" title="Demo lab">
             <i class="fa-solid fa-flask" aria-hidden="true"></i>
           </button>
@@ -130,9 +133,9 @@
               </p>
             </div>
             <div class="page-head-actions">
-              <button class="btn btn-secondary btn-live" type="button" id="connect-esp32-btn" onclick="connectEsp32()" aria-label="Connect directly to the ESP32 gateway">
+              <button class="btn btn-secondary btn-live" type="button" id="connect-esp32-btn" onclick="connectEsp32()" aria-label="Connect to Orion X">
                 <span class="live-dot" aria-hidden="true"></span>
-                <span>ESP32 live</span>
+                <span id="connect-esp32-label">Connect Orion X</span>
               </button>
               <button class="btn btn-secondary" type="button" id="scan-btn" onclick="runScan()" aria-label="Run a new vehicle scan">
                 <i class="fa-solid fa-rotate" aria-hidden="true"></i>
@@ -301,41 +304,6 @@
               </div>
 
               <div class="card-foot" id="tpms-footnote"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Pressure checked 2 minutes ago</div>
-            </article>
-
-            <article class="card location-card">
-              <div class="card-head">
-                <div>
-                  <h2>Live location</h2>
-                  <p id="location-sub">Waiting for the ESP32 location feed</p>
-                </div>
-                <span class="chip chip--quiet" id="location-source-chip"><span class="status-dot" aria-hidden="true"></span><span id="location-source">No fix</span></span>
-              </div>
-
-              <div class="location-body">
-                <div class="location-primary">
-                  <span class="location-icon" aria-hidden="true"><i class="fa-solid fa-location-crosshairs"></i></span>
-                  <div class="location-copy">
-                    <strong id="location-place">Location unavailable</strong>
-                    <span id="location-coords">--</span>
-                  </div>
-                </div>
-
-                <dl class="location-facts">
-                  <div><dt>Fix</dt><dd id="location-fix">None</dd></div>
-                  <div><dt>Satellites</dt><dd id="location-sats">0</dd></div>
-                  <div><dt>Age</dt><dd id="location-age">--</dd></div>
-                  <div><dt>Speed</dt><dd id="location-speed">--</dd></div>
-                </dl>
-
-                <div class="location-action">
-                  <button class="btn btn-secondary btn-sm" type="button" id="location-use-btn" onclick="useMyLocation()">
-                    <i class="fa-solid fa-location-arrow" aria-hidden="true"></i>
-                    <span>Use my location</span>
-                  </button>
-                  <p class="location-hint" id="location-hint">Browser GPS is sent to the ESP32 over MQTT, then echoed back with source “app”.</p>
-                </div>
-              </div>
             </article>
 
           </div>
@@ -600,8 +568,8 @@
               <article class="card ai-model-card" id="ai-model-card" data-tone="good">
                 <div class="card-head">
                   <div>
-                    <h2>Predictive model</h2>
-                    <p>Unsupervised anomaly detection on live telemetry.</p>
+                    <h2>Early warning</h2>
+                    <p>Learns how your vehicle normally behaves and flags changes early.</p>
                   </div>
                   <span class="chip chip--good" id="ai-model-state">Normal</span>
                 </div>
@@ -618,21 +586,21 @@
                 </div>
 
                 <div class="ai-fact-grid">
-                  <div><span>Nearest cluster</span><strong id="ai-cluster">--</strong></div>
+                  <div><span>Closest pattern</span><strong id="ai-cluster">--</strong></div>
                   <div><span>Confidence</span><strong id="ai-confidence">--</strong></div>
-                  <div><span>Baseline</span><strong id="ai-samples">--</strong></div>
+                  <div><span>Learning</span><strong id="ai-samples">--</strong></div>
                   <div><span>14-day view</span><strong id="ai-forecast">--</strong></div>
                 </div>
 
                 <div class="ai-signals" id="ai-signals">
                   <div class="ai-signal">
-                    <span class="ai-signal-name"><span class="ai-signal-dot"></span>Waiting for telemetry</span>
+                    <span class="ai-signal-name"><span class="ai-signal-dot"></span>Waiting for vehicle data</span>
                     <strong>--</strong>
                   </div>
                 </div>
 
                 <button class="btn btn-secondary btn-sm full-width ai-explain-btn" type="button" onclick="explainAiModel()">
-                  <i class="fa-solid fa-microchip" aria-hidden="true"></i> Explain this model
+                  <i class="fa-solid fa-microchip" aria-hidden="true"></i> How this works
                 </button>
               </article>
 
@@ -707,21 +675,21 @@
                 <span class="chat-avatar"><i class="fa-solid fa-user-gear" aria-hidden="true"></i></span>
                 <div class="chat-title">
                   <h2>AI Mechanic</h2>
-                  <p><span class="status-dot" aria-hidden="true"></span>Online · local ML · anomaly model</p>
+                  <p><span class="status-dot" aria-hidden="true"></span>Online · built into Orion X</p>
                 </div>
               </div>
 
               <div class="chat-model-strip">
-                <span><i class="fa-solid fa-microchip" aria-hidden="true"></i> Unsupervised model</span>
-                <strong id="chat-model-summary">Learning baseline…</strong>
+                <span><i class="fa-solid fa-microchip" aria-hidden="true"></i> Early warning</span>
+                <strong id="chat-model-summary">Learning your vehicle…</strong>
               </div>
 
               <div class="chat-stream" id="assistant-chat-stream" aria-live="polite">
                 <div class="msg msg--bot">
-                  <p>Hi — I'm Orion's AI mechanic. I use a local TF-IDF intent model and an unsupervised k-means anomaly detector on your live telemetry.</p>
+                  <p>Hi — I'm Orion's AI mechanic. I learn how your vehicle normally behaves and watch for early changes.</p>
                 </div>
                 <div class="msg msg--bot">
-                  <p>Ask <strong>“What will fail next?”</strong> for a predictive scan, or ask about a system and I'll ground the answer in the model's signal scores.</p>
+                  <p>Ask <strong>“What will fail next?”</strong> for an early warning, or ask about a system and I'll explain it using your live readings.</p>
                 </div>
               </div>
 
@@ -730,7 +698,7 @@
                 <button class="chat-chip" type="button" onclick="askMechanicQuestion('What looks anomalous right now?')">What looks anomalous?</button>
                 <button class="chat-chip" type="button" onclick="askMechanicQuestion('Why does the car feel like it runs warm?')">Why is the car warm?</button>
                 <button class="chat-chip" type="button" onclick="askMechanicQuestion('How long can I drive on my current brake pads?')">Brake pad life</button>
-                <button class="chat-chip" type="button" onclick="askMechanicQuestion('How does the unsupervised AI model work?')">How does the AI work?</button>
+                <button class="chat-chip" type="button" onclick="askMechanicQuestion('How does the early warning work?')">How does it work?</button>
               </div>
 
               <form class="chat-form" id="assistant-form">
@@ -813,7 +781,7 @@
         <button class="garage-item" type="button" data-car="live" id="garage-live" onclick="selectCar('live')" aria-pressed="false" hidden>
           <span class="garage-car">
             <span class="garage-icon"><i class="fa-solid fa-microchip" aria-hidden="true"></i></span>
-            <span class="garage-copy"><strong id="garage-live-name">ESP32 live vehicle</strong><small id="garage-live-meta">Direct gateway · waiting</small></span>
+            <span class="garage-copy"><strong id="garage-live-name">Orion X vehicle</strong><small id="garage-live-meta">Waiting for Orion X</small></span>
           </span>
           <span class="garage-score"><strong data-score-for="live">--</strong><small>/ 100</small><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span>
         </button>
@@ -890,7 +858,7 @@
           <i class="fa-solid fa-xmark" aria-hidden="true"></i>
         </button>
       </div>
-      <p class="modal-desc">Choose a scenario to see how the dashboard responds. Values stay simulated until you reset.</p>
+      <p class="modal-desc">Choose a scenario to see how the dashboard responds. Values stay in demo mode until you reset.</p>
 
       <div class="demo-grid">
         <button class="demo-option" type="button" onclick="triggerTestScenario('overheat')">
@@ -918,10 +886,16 @@
         </button>
       </div>
 
-      <a class="btn btn-secondary full-width demo-fleet-link" href="fleet.html">
-        <i class="fa-solid fa-building-columns" aria-hidden="true"></i>
-        Open fleet manager
-      </a>
+      <div class="demo-fleet-row" style="display:flex;gap:8px;margin-top:16px;">
+        <a class="btn btn-secondary full-width demo-fleet-link" href="fleet.html" style="margin-top:0;">
+          <i class="fa-solid fa-building-columns" aria-hidden="true"></i>
+          Open fleet manager
+        </a>
+        <button class="btn btn-secondary" type="button" onclick="triggerOrionXBuzzer()" aria-label="Sound Orion X" title="Sound Orion X buzzer" style="white-space:nowrap;">
+          <i class="fa-solid fa-volume-high" aria-hidden="true"></i>
+          <span>Sound</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -931,8 +905,8 @@
   </div>
 
   <script src="mqtt.min.js?v=5.10.4"></script>
-  <script src="live-telemetry.js?v=1.5"></script>
+  <script src="live-telemetry.js?v=1.6"></script>
   <script src="ai-engine.js?v=1.1"></script>
-  <script src="app.js?v=12.8"></script>
+  <script src="app.js?v=12.9"></script>
 </body>
 </html>

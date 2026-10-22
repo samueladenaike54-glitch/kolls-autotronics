@@ -453,6 +453,11 @@
     return true;
   }
 
+  function sendBuzzer(durationMs) {
+    const ms = clamp(Math.round(toNumber(durationMs, 900)), 300, 3000);
+    return publishJson({ action: 'buzzer', ms }, 'BUZZER');
+  }
+
   function sendLocation(location) {
     const source = location && typeof location === 'object' ? location : {};
     const lat = toNumber(source.lat, null);
@@ -792,6 +797,7 @@
     setGateway,
     gatewayUrl,
     sendCommand,
+    sendBuzzer,
     sendLocation,
     status,
     healthyScore,
