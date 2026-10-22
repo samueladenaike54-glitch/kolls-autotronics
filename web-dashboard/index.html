@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <link rel="stylesheet" href="styles.css?v=13.5">
+  <link rel="stylesheet" href="styles.css?v=99.0">
 </head>
 <body>
   <svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
@@ -72,6 +72,14 @@
           </span>
           <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
         </a>
+        <button class="sidebar-demo sidebar-demo--secondary sidebar-demo--buzzer" type="button" onclick="triggerOrionXBuzzer()" style="width:100%;margin-top:6px;cursor:pointer;">
+          <span class="sidebar-demo-icon" style="color:var(--danger,#ef4444);"><i class="fa-solid fa-volume-high" aria-hidden="true"></i></span>
+          <span class="sidebar-demo-copy">
+            <strong>Sound Orion X</strong>
+            <small>Test buzzer</small>
+          </span>
+          <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+        </button>
         <button class="sidebar-demo sidebar-demo--secondary" type="button" onclick="openSimModal()">
           <span class="sidebar-demo-icon"><i class="fa-solid fa-flask" aria-hidden="true"></i></span>
           <span class="sidebar-demo-copy">
@@ -907,6 +915,6 @@
   <script src="mqtt.min.js?v=5.10.4"></script>
   <script src="live-telemetry.js?v=1.6"></script>
   <script src="ai-engine.js?v=1.1"></script>
-  <script src="app.js?v=12.9"></script>
+  <script src="app.js?v=99.0"></script>
 </body>
 </html>

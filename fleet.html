@@ -14,8 +14,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <link rel="stylesheet" href="styles.css?v=13.5">
-  <link rel="stylesheet" href="fleet.css?v=1.3">
+  <link rel="stylesheet" href="styles.css?v=99.0">
+  <link rel="stylesheet" href="fleet.css?v=99.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -117,7 +117,7 @@
             <input type="search" id="global-vehicle-search" placeholder="Search fleet" autocomplete="off" spellcheck="false">
           </label>
 
-          <button class="btn btn-secondary fleet-buzzer-btn" type="button" id="fleet-buzzer-btn" onclick="triggerOrionXBuzzer()" disabled aria-label="Sound the Orion X buzzer" title="Sound Orion X">
+          <button class="btn btn-secondary fleet-buzzer-btn" type="button" id="fleet-buzzer-btn" onclick="triggerOrionXBuzzer()" aria-label="Sound the Orion X buzzer" title="Sound Orion X">
             <i class="fa-solid fa-volume-high" aria-hidden="true"></i>
             <span>Sound Orion X</span>
           </button>
@@ -127,7 +127,7 @@
             <span class="fleet-bell-badge" id="bell-alert-count">0</span>
           </button>
 
-          <div class="fleet-user" title="Fleet manager · Adaeze Okonkwo">
+          <div class="fleet-user" onclick="triggerOrionXBuzzer()" style="cursor:pointer;" title="Fleet manager (Click to sound buzzer) · Adaeze Okonkwo">
             <span class="fleet-avatar">AO</span>
             <span class="fleet-user-copy"><strong>Adaeze O.</strong><small>Fleet manager</small></span>
           </div>
@@ -744,6 +744,6 @@
 
   <script src="mqtt.min.js?v=5.10.4"></script>
   <script src="live-telemetry.js?v=1.6"></script>
-  <script src="fleet.js?v=1.4"></script>
+  <script src="fleet.js?v=99.0"></script>
 </body>
 </html>

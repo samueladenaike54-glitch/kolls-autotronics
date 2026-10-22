@@ -570,11 +570,24 @@ svg {
   color: var(--ink);
 }
 
+.topbar-buzzer {
+  display: inline-grid !important;
+  color: var(--accent-bright);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.topbar-buzzer:hover {
+  background: var(--surface-2);
+  border-color: var(--accent-bright);
+}
+
 .topbar-buzzer.is-sounding {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: var(--danger, #ef4444);
-  color: var(--danger, #ef4444);
-  animation: pulse-buzz 0.3s ease infinite alternate;
+  background: rgba(239, 68, 68, 0.25) !important;
+  border-color: var(--danger, #ef4444) !important;
+  color: var(--danger, #ef4444) !important;
+  animation: pulse-buzz 0.25s ease infinite alternate;
 }
 
 @keyframes pulse-buzz {

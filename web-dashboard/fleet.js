@@ -670,6 +670,13 @@ function renderMap(containerId, vehicles, variant) {
 
   if (typeof L === 'undefined') {
     container.innerHTML = '<div style="display:grid;place-items:center;height:100%;color:var(--muted);font-size:12px;">Connecting to map network...</div>';
+    const retryTimer = setInterval(() => {
+      if (typeof L !== 'undefined') {
+        clearInterval(retryTimer);
+        renderMap(containerId, vehicles, variant);
+      }
+    }, 150);
+    setTimeout(() => clearInterval(retryTimer), 8000);
     return;
   }
 
@@ -682,7 +689,7 @@ function renderMap(containerId, vehicles, variant) {
       scrollWheelZoom: variant === 'tracking'
     }).setView([6.50, 3.39], variant === 'overview' ? 11 : 12);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       subdomains: 'abcd'
     }).addTo(map);
@@ -1676,6 +1683,7 @@ function showPage(page) {
   }
 
   document.title = `${PAGE_TITLES[page]} · Orion Fleet`;
+  setTimeout(() => { Object.values(leafletMaps).forEach(m => m && m.invalidateSize()); }, 120);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1845,7 +1853,7 @@ function updateFleetLive() {
   const sub = document.getElementById('fleet-device-sub');
   const button = document.getElementById('fleet-buzzer-btn');
 
-  if (button) button.disabled = !(status && status.connected);
+  if (button) button.disabled = false;
 
   const setChip = (tone, text) => {
     if (chip) {
