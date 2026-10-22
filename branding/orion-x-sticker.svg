@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60mm" height="60mm" viewBox="0 0 600 600" role="img" aria-labelledby="orionXTitle orionXDesc">
+  <title id="orionXTitle">Orion X sticker</title>
+  <desc id="orionXDesc">Dark rounded sticker with the Orion constellation mark, the words ORION X, and Kolls Autotronics.</desc>
+  <defs>
+    <clipPath id="stickerClip">
+      <rect width="600" height="600" rx="78"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#stickerClip)">
+    <rect width="600" height="600" fill="#151614"/>
+
+    <!-- soft brand glow behind the mark -->
+    <circle cx="300" cy="178" r="176" fill="#3ddb9a" opacity="0.055"/>
+
+    <!-- inner keyline keeps the sticker readable on dark devices -->
+    <rect x="20" y="20" width="560" height="560" rx="58" fill="none" stroke="#3ddb9a" stroke-opacity="0.58" stroke-width="3"/>
+
+    <!-- Orion constellation mark, reused from the website logo -->
+    <g transform="translate(300 178) scale(3.8) translate(-32 -32)">
+      <g fill="none" stroke="#f7f7f2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 48 27 36 36 29 43 21"/>
+      </g>
+      <g fill="#f7f7f2">
+        <circle cx="16" cy="48" r="3.5"/>
+        <circle cx="27" cy="36" r="3.5"/>
+        <circle cx="36" cy="29" r="3.5"/>
+      </g>
+      <path d="M47 10 48.8 14.2 53 16 48.8 17.8 47 22 45.2 17.8 41 16 45.2 14.2Z" fill="#3ddb9a"/>
+      <circle cx="18" cy="18" r="1.8" fill="#f7f7f2" opacity="0.5"/>
+      <circle cx="51" cy="47" r="1.8" fill="#f7f7f2" opacity="0.5"/>
+    </g>
+
+    <!-- wordmark -->
+    <text x="300" y="397" text-anchor="middle"
+      font-family="'Arial Black', 'Segoe UI Black', Arial, sans-serif"
+      font-size="96" font-weight="900" letter-spacing="2" fill="#f7f7f2">ORION <tspan fill="#3ddb9a">X</tspan></text>
+
+    <!-- small brand line -->
+    <text x="300" y="470" text-anchor="middle"
+      font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif"
+      font-size="22" font-weight="700" letter-spacing="8" fill="#f7f7f2" fill-opacity="0.72">KOLLS AUTOTRONICS</text>
+  </g>
+</svg>

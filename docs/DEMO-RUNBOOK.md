@@ -25,11 +25,15 @@
 
 ## 3. Pre-flight (do this at home, Thursday/Friday)
 
-- [ ] Flash the firmware, confirm the Serial Monitor shows `Sketch uses …` and the boot banner
+- [ ] Flash the firmware: `tools\flash-esp32.cmd COM11` (writes the merged 4 MB image at 0x0)
+- [ ] After this flash, later updates go **over WiFi** — no USB needed: Arduino IDE → Tools → Port → **kolls-gw** (password `kolls2026`), then Upload. Hostname `kolls-gw.local`
 - [ ] Confirm the car data: plug into a running car → `[OBD] First ECU response decoded - hardware feed is LIVE` and RPM/coolant values that match a normal scan tool
-- [ ] Confirm the TFT carousel runs (4 pages: KOLLS → ENGINE → NODE → NET)
-- [ ] On the NET page, read the **IP ADDRESS** — that is the URL you will use on stage
-- [ ] Charge the 18650 pack (device should be > 3.9 V / > 50 %)
+- [ ] Confirm the TFT carousel runs (5 pages, 4.2 s hold + 1.6 s glide: **DRIVE → THERMAL → POWER → HEALTH → LINK**)
+- [ ] Buzzer on **GPIO 27** (`+` to 27, `-` to GND): two chirps on the ORION X screen, one chirp on KOLLS; then warning = 110 ms beep every 3 s, critical = 180 ms beep every 0.6 s. Silent on the bench (simulation never alarms). **Loudness:** active buzzer runs at 3.3 V, so press it against the case (or cup it) and it will be noticeably louder; a 5 V buzzer needs an NPN driver for full volume
+- [ ] Confirm the top band is calm (three LEDs — **WiFi · severity · CAN** — plus page dashes, no coloured fault band) and the bottom strip is white on the bench
+- [ ] Unplug the OBD with the engine running → top band turns red with **!CAN LOST** and the strip floods red (then replug)
+- [ ] On the LINK page, read `IP .xx` — the last octet is the URL address you will use on stage
+- [ ] Charge the 18650 pack (device should be > 3.9 V / > 50 %). No divider fitted? The strip shows `--` in grey — that is correct, not a fault
 - [ ] Save a copy of the firmware + a **pre-flashed spare** if you have one
 
 ---
@@ -128,7 +132,7 @@ The gateway sends `Access-Control-Allow-Origin: *`, so a dashboard served from G
 2. *"Plugged into the OBD port. It requests Mode 01 PIDs on the CAN bus and decodes RPM, coolant, load, voltage and fuel trims."*
 3. *"The health model runs **on the device** — that's the score and the subsystem breakdown you're seeing."*
 4. *"Anti-tamper: if someone pulls the plug, the node sees the CAN feed go silent and latches an alert."*
-5. *"The TFT is a four-page scrolling cluster; the dashboard you're looking at is served by the device itself over local WiFi."*
+5. *"The TFT is a five-page scrolling cluster — drive, thermal, power, health, link — and the dashboard you're looking at is served by the device itself over local WiFi."*
 
 ---
 
@@ -139,9 +143,13 @@ The gateway sends `Access-Control-Allow-Origin: *`, so a dashboard served from G
 | Browser shows "device offline" | Laptop not on the same hotspot | Join the phone hotspot the ESP is on |
 | Page loads but values frozen | ESP rebooted / lost WiFi | Check the TFT NET page IP; re-read the IP |
 | Values show `--` / SIM | OBD not answering | Ignition ON, then engine ON (some ECUs need the engine) |
-| TFT black | Backlight / RST | Check the SPI wires; the boot splash confirms it |
+| Top-band **WiFi dot red** | Not connected to the hotspot | Join the phone hotspot; the dot turns green within ~10 s (LINK page shows RSSI) |
+| No **kolls-gw** entry in Arduino IDE ports | Laptop on a different network than the ESP | Join the same hotspot, reopen Tools → Port; or fall back to USB flash |
+| TFT black | Backlight / RST | Check the SPI wires; an **ORION X** splash (constellation + wordmark) at boot confirms the panel works |
 | App blank but Mode A works | App-side fetch issue | Switch to Mode A tab (device page) |
-| TFT shows **DEVICE BATT LOW** (yellow) / **DEVICE BATT CRITICAL** (red strobe) | 18650 pack flat | **Swap the charged cell now** — the node will brown out and reboot mid-demo. The pack gauge is on the TFT NODE page and in the app's `gateway.device_pct` |
+| TFT strip floods red with **!CAN LOST** | OBD unplugged or ECU asleep | Ignition ON / reseat the OBD plug; the strip returns to white within one frame |
+| TFT shows `--` on the pack row | No ADC divider fitted (by design) | Not a fault — the gateway runs from USB/bench supply in this config |
+| TFT shows **!LOW BATT** (red band, red strip) | 18650 pack flat (divider fitted) | **Swap the charged cell now** — the node will brown out and reboot mid-demo |
 | Everything dead | Battery flat | 5V from the bench supply; the node runs fine from USB too |
 | Venue WiFi only (no hotspot allowed) | client isolation | Switch to Mode C (MQTT) — needs internet only |
 

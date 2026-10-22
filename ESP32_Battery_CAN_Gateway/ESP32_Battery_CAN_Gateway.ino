@@ -1,4 +1,4 @@
-﻿/*
+ /*
  * ==============================================================================================
  *                       KOLLS AUTOTRONICS - VEHICLE HEALTH MONITOR
  *                       FIRMWARE VERSION 2.0  (BATTERY EDITION)
@@ -30,7 +30,7 @@
  *                    - Battery-power OBD-UNPLUG / disconnect detection (CAN-silence latch)
  *                    - Device battery fuel gauge (ADC divider) with low-battery escalation
  *                    - Automatic Fallback CAN Simulation Engine for bench testing
- *                    - Optional 1.8" ST7735 TFT live gauge display (compile-time toggle)
+ *                    - Optional 1.14" 135x240 ST7789 TFT live gauge display (compile-time toggle)
  *
  *  REQUIRED LIBRARIES (Arduino Library Manager):
  *    1. "PubSubClient"   by Nick O'Leary    (v2.8.0+)
@@ -49,6 +49,7 @@
 #include <WebServer.h>
 #include <ESPmDNS.h>
 #include "driver/twai.h"
+#include "driver/gpio.h"
 
 #define USE_TFT 1                 // Set 0 for a bare telemetry node (no display attached)
 #define DEVICE_BATT_MONITOR 1     // Set 0 if no ADC divider is wired yet
@@ -57,7 +58,10 @@
   #include <SPI.h>
   #include <Adafruit_GFX.h>
   #include <Adafruit_ST7735.h>
+    #include <Fonts/FreeSansBold9pt7b.h>
+  #include <Fonts/FreeSansBold18pt7b.h>
 #endif
+#include <ArduinoOTA.h>
 
 // ==============================================================================================
 //                                   CONFIGURATION
@@ -82,6 +86,7 @@ const uint16_t TANK_RANGE_KM_FULL = 600;   // estimated km on a full tank (used 
 // ----------------------------------------------------------------------------------------------
 #define CAN_TX_PIN GPIO_NUM_5   // -> transceiver TXD (pin 1)
 #define CAN_RX_PIN GPIO_NUM_4   // <- transceiver RXD (pin 4)
+#define BUZZER_PIN 27           // active buzzer: + to GPIO27, - to GND
 
 // ----------------------------------------------------------------------------------------------
 // Device battery fuel gauge (ADC divider on GPIO34; input-only pin, ADC1)
@@ -97,7 +102,7 @@ const uint16_t TANK_RANGE_KM_FULL = 600;   // estimated km on a full tank (used 
 #endif
 
 // ----------------------------------------------------------------------------------------------
-// TFT display pins (1.8" ST7735 SPI) - identical to firmware v1.0
+// TFT display pins (1.14" 135x240 ST7789 SPI)
 // ----------------------------------------------------------------------------------------------
 #define TFT_CS    15
 #define TFT_RST   16
@@ -160,10 +165,29 @@ struct DeviceState {
   float    device_v;           // our 18650 pack voltage (ADC divider)
   uint8_t  device_pct;         // estimated state of charge 0-100%
   bool     device_low;         // below warn threshold
+  bool     connected;          // false = no ADC divider fitted (pack value unknown)
   bool     device_critical;    // below critical threshold
   bool     obd_detached;       // latched: was receiving OBD data, then went silent
   uint16_t disconnect_count;   // total OBD dropout events since boot
   bool     everSawOBD;         // have we EVER decoded a Mode-01 response?
+};
+
+// ---------------------------------------------------------------------------------
+// Location: IP geolocation (city level) OR a position pushed by the browser app
+// (real device GPS). Published in every payload as a "location" object.
+// ---------------------------------------------------------------------------------
+struct LocationState {
+  bool     valid;              // do we have usable coordinates?
+  char     source[8];          // "ip" | "app" | "gps"
+  double   lat;
+  double   lon;
+  float    speed_kmh;
+  float    alt_m;
+  uint8_t  sats;               // satellites (app-pushed) / 0 for IP geo
+  uint8_t  fix;                // 0 = no fix, 1 = GPS, 2 = DGPS
+  uint32_t updated_ms;
+  char     city[28];
+  char     country[24];
 };
 
 // ==============================================================================================
@@ -177,8 +201,12 @@ WebServer  httpServer(80);      // direct-connect demo server (defined early: us
   Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 #endif
 
-TelemetryData telemetry;
-DeviceState   device;
+struct TelemetryData telemetry;
+struct DeviceState   device;
+struct LocationState location;
+
+unsigned long lastGeoFetch = 0;          // IP geo-lookup cadence
+const unsigned long GEO_INTERVAL_MS = 300000;   // 5 minutes
 
 // Timing
 unsigned long lastPublishTime    = 0;
@@ -230,7 +258,139 @@ void sendOBDRequest(uint8_t pid);
 void cycleOBDRequests();
 void readCANBus();
 void simulateCANData();
+// ==============================================================================================
+//                             LOCATION (IP geo + app-pushed GPS)
+// ==============================================================================================
+/**
+ * Two sources, one contract:
+ *
+ *   source = "ip"  - the device asks a free IP-geolocation service where its own
+ *                     public IP is registered. City level (+/- ~20 km). It is the
+ *                     carrier's location, not the vehicle's, and it does not move.
+ *                     Used as a floor so the map is never empty.
+ *
+ *   source = "app" - the browser app calls navigator.geolocation (real device GPS)
+ *                     and pushes the fix to the device on the command topic. This is
+ *                     the accurate one. The device re-publishes it so the TFT and
+ *                     the fleet map share the same position.
+ *
+ * A real GPS module on UART would report source = "gps" with the same fields, so
+ * the app contract never changes.
+ */
+void fetchIpGeolocation() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  WiFiClientSecure https;
+  https.setInsecure();
+  https.setTimeout(8000);
+  if (!https.connect("ipapi.co", 443)) {
+    Serial.println(F("[GEO] ip-api TLS connect failed"));
+    return;
+  }
+  // HTTP/1.0 => no chunked encoding, body ends with the socket close
+  https.print("GET /json/ HTTP/1.0\r\nHost: ipapi.co\r\nUser-Agent: KollsAutoTronics\r\n\r\n");
+
+  String body;
+  while (https.connected() && https.available()) {
+    body += https.readStringUntil('\n');
+    if (body.length() > 3000) break;
+  }
+  https.stop();
+
+  int brace = body.indexOf('{');
+  if (brace < 0) { Serial.println(F("[GEO] no JSON body")); return; }
+
+#if ARDUINOJSON_VERSION_MAJOR >= 7
+  JsonDocument doc;
+#else
+  StaticJsonDocument<768> doc;
+#endif
+  if (deserializeJson(doc, body.substring(brace)) != DeserializationError::Ok) {
+    Serial.println(F("[GEO] JSON parse failed"));
+    return;
+  }
+
+  double lat = doc["latitude"].as<double>();
+  double lon = doc["longitude"].as<double>();
+  if (lat == 0.0 && lon == 0.0) return;
+
+  // Do not overwrite a real (app-pushed) fix with the coarse IP estimate
+  if (location.valid && strcmp(location.source, "app") == 0) return;
+
+  location.lat      = lat;
+  location.lon      = lon;
+  location.valid    = true;
+  location.fix      = 0;                    // IP geo is not a satellite fix
+  location.sats     = 0;
+  location.updated_ms = millis();
+  strncpy(location.source, "ip", sizeof(location.source) - 1);
+  location.source[sizeof(location.source) - 1] = '\0';
+  strncpy(location.city, doc["city"] | "?", sizeof(location.city) - 1);
+  location.city[sizeof(location.city) - 1] = '\0';
+  strncpy(location.country, doc["country_name"] | "?", sizeof(location.country) - 1);
+  location.country[sizeof(location.country) - 1] = '\0';
+
+  Serial.printf("[GEO] IP location: %.4f, %.4f (%s, %s)\n", lat, lon, location.city, location.country);
+}
+
+/**
+ * Accepts a browser-pushed position:
+ *   { "action":"location", "lat":6.5244, "lon":3.3792, "sats":9, "fix":1,
+ *     "speed":42.3, "alt":18.0, "city":"Ikeja" }
+ */
+bool applyAppLocation(const char* payload) {
+#if ARDUINOJSON_VERSION_MAJOR >= 7
+  JsonDocument doc;
+#else
+  StaticJsonDocument<512> doc;
+#endif
+  if (deserializeJson(doc, payload) != DeserializationError::Ok) return false;
+
+  if (!doc["lat"].is<double>() && !doc["lat"].is<float>()) return false;
+  double lat = doc["lat"].as<double>();
+  double lon = doc["lon"].as<double>();
+  if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) return false;
+
+  location.lat        = lat;
+  location.lon        = lon;
+  location.valid      = true;
+  int fixVal   = doc["fix"] | 1;
+  int satVal   = doc["sats"] | 0;
+  float spdVal = doc["speed"] | 0.0f;
+  float altVal = doc["alt"] | 0.0f;
+  location.fix        = (uint8_t)constrain(fixVal, 0, 2);
+  location.sats       = (uint8_t)constrain(satVal, 0, 99);
+  location.speed_kmh  = spdVal;
+  location.alt_m      = altVal;
+  location.updated_ms = millis();
+  strncpy(location.source, "app", sizeof(location.source) - 1);
+  location.source[sizeof(location.source) - 1] = '\0';
+  const char* city = doc["city"] | "";
+  strncpy(location.city, city, sizeof(location.city) - 1);
+  location.city[sizeof(location.city) - 1] = '\0';
+
+  Serial.printf("[GEO] app position: %.4f, %.4f (fix %u, %u sats)\n",
+                lat, lon, location.fix, location.sats);
+  return true;
+}
+
+void updateLocation() {
+  // An app-pushed fix expires after 2 minutes (the phone may have moved/gone away)
+  if (location.valid && strcmp(location.source, "app") == 0 &&
+      (millis() - location.updated_ms > 120000)) {
+    location.valid = false;
+    location.fix   = 0;
+  }
+
+  // Refresh the IP estimate every 5 minutes (and once shortly after boot)
+  if (millis() - lastGeoFetch > GEO_INTERVAL_MS) {
+    lastGeoFetch = millis();
+    fetchIpGeolocation();
+  }
+}
+
 void updateDeviceBattery();
+void updateLocation();
 void checkObdDetach(unsigned long now);
 void evaluateSystemHealth();
 void computeHealthModel();
@@ -243,11 +403,174 @@ size_t buildAppJson(char* out, size_t outLen);
 void startHttpServer();
 void printTelemetrySerial();
 #if USE_TFT
-  void displayBootScreen();
+  // UiRow must exist at this scope: the Arduino preprocessor hoists uiRowSet/uiRowDraw
+  // prototypes above the TFT block where the functions live.
+  struct UiRow { uint8_t id; char txt[14]; uint16_t col; };
   void uiInit();
+  void uiRowSet(UiRow& r, uint8_t id, const char* txt, uint16_t col);
+  void uiRowDraw(Adafruit_GFX& g, int16_t y, const UiRow& r, uint8_t pct);
   void renderPage(uint8_t page, Adafruit_GFX& g);
   void uiTick(unsigned long now);
-  void drawFooter(bool force = false);
+  void drawStrip();
+#endif
+
+// ==============================================================================================
+//                                      BUZZER (active)
+// ==============================================================================================
+// Active buzzer = built-in oscillator: drive the pin HIGH and it sounds.
+// Boot: two chirps on the logo, one on the company screen.
+// Alerts: warning = short beep every 4 s, critical = urgent beep every 650 ms.
+// Simulation/bench never alarms, so the buzzer stays silent with no car.
+static unsigned long buzzerOffAt  = 0;     // 0 = not sounding
+static unsigned long buzzerNextAt = 0;
+static uint8_t       buzzerLastSev = 0;
+
+void buzzerInit() {
+  pinMode(BUZZER_PIN, OUTPUT);
+  gpio_set_drive_capability((gpio_num_t)BUZZER_PIN, GPIO_DRIVE_CAP_3);  // 40 mA pin drive
+  digitalWrite(BUZZER_PIN, LOW);
+}
+void buzzerChirp(uint16_t onMs, uint16_t offMs) {   // blocking: boot only
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(onMs);
+  digitalWrite(BUZZER_PIN, LOW);
+  if (offMs) delay(offMs);
+}
+void buzzerPulse(uint16_t ms) {   // non-blocking: app/fleet "Sound Orion X"
+  if (ms < 50) ms = 50;
+  buzzerOffAt = millis() + ms;
+  digitalWrite(BUZZER_PIN, HIGH);
+}
+void buzzerTick(unsigned long now) {
+  if (buzzerOffAt && (long)(now - buzzerOffAt) >= 0) {   // end of beep
+    digitalWrite(BUZZER_PIN, LOW);
+    buzzerOffAt = 0;
+  }
+  uint8_t sev = telemetry.severity;
+  if (sev == 0) { buzzerLastSev = 0; return; }
+
+  unsigned long period = (sev >= 2) ? 600UL : 3000UL;
+  uint16_t      onMs   = (sev >= 2) ? 180 : 110;
+
+  if (buzzerLastSev == 0) {           // fault just appeared -> sound immediately
+    buzzerNextAt = now;
+  }
+  if (!buzzerOffAt && (long)(now - buzzerNextAt) >= 0) {
+    digitalWrite(BUZZER_PIN, HIGH);
+    buzzerOffAt  = now + onMs;
+    buzzerNextAt = now + period;
+  }
+  buzzerLastSev = sev;
+}
+
+// ==============================================================================================
+//                                    BOOT SPLASH (phone-style)
+// ==============================================================================================
+#if USE_TFT
+static int16_t gfxAdvance(const char* s, const GFXfont* f) {
+  int16_t a = 0;
+  while (*s) {
+    a += (int16_t)pgm_read_byte(&f->glyph[(uint8_t)*s - f->first].xAdvance);
+    s++;
+  }
+  return a;
+}
+static void gfxTextAt(Adafruit_GFX& g, const char* s, int16_t x, int16_t y,
+                      uint16_t color, const GFXfont* f) {
+  g.setFont(f);
+  g.setTextSize(1);
+  g.setTextColor(color);
+  g.setCursor(x, y);
+  g.print(s);
+}
+static void gfxTrackedAt(Adafruit_GFX& g, const char* s, int16_t x, int16_t y,
+                         int16_t tracking, uint16_t color, const GFXfont* f) {
+  g.setFont(f);
+  g.setTextSize(1);
+  g.setTextColor(color);
+  int16_t cx = x;
+  while (*s) {
+    g.setCursor(cx, y);
+    g.print((char)*s);
+    cx += (int16_t)pgm_read_byte(&f->glyph[(uint8_t)*s - f->first].xAdvance) + tracking;
+    s++;
+  }
+}
+
+static void smallTrackedAt(Adafruit_GFX& g, const char* s, int16_t y,
+                           int16_t tracking, uint16_t color) {
+  // Unscaled built-in 5x7 font: crisp small caps for splash sub-lines.
+  g.setFont(NULL);
+  g.setTextSize(1);
+  g.setTextColor(color);
+  int16_t n = (int16_t)strlen(s);
+  int16_t w = n * 6 + tracking * (n - 1);
+  int16_t cx = (128 - w) / 2;
+  while (*s) {
+    if (*s != ' ') {
+      g.setCursor(cx, y);
+      g.print((char)*s);
+    }
+    cx += 6 + tracking;
+    s++;
+  }
+}
+
+void bootSplash() {
+  const GFXfont* F9B = &FreeSansBold9pt7b;
+  int16_t bx, by; uint16_t bw, bh;
+
+  // ---------- stage 1: ORION X ----------
+  tft.fillScreen(0xF7BE);                 // T_BG
+  // constellation mark (branding/orion-x-sticker.svg)
+  tft.drawLine(34, 64, 50, 53, 0x10A2);
+  tft.drawLine(50, 53, 64, 46, 0x10A2);
+  tft.drawLine(64, 46, 76, 38, 0x10A2);
+  tft.fillCircle(34, 64, 2, 0x10A2);
+  tft.fillCircle(50, 53, 2, 0x10A2);
+  tft.fillCircle(64, 46, 2, 0x10A2);
+  tft.fillCircle(30, 38, 1, 0x63DB);     // faint stars
+  tft.fillCircle(74, 58, 1, 0x63DB);
+  tft.fillTriangle(90, 30, 94, 36, 86, 36, 0x0BCA);   // accent sparkle
+  tft.fillTriangle(90, 42, 86, 36, 94, 36, 0x0BCA);
+
+  buzzerChirp(90, 80);                    // boot chirp
+  buzzerChirp(90, 0);
+
+  // wordmark: centre on the ink bounds, then place X after the space advance
+  tft.setFont(F9B);
+  tft.setTextSize(1);
+  tft.getTextBounds("ORION X", 0, 0, &bx, &by, &bw, &bh);
+  int16_t sx = (128 - (int16_t)bw) / 2 - bx;
+  gfxTextAt(tft, "ORION", sx, 102, 0x10A2, F9B);
+  gfxTextAt(tft, "X", sx + gfxAdvance("ORION ", F9B), 102, 0x0BCA, F9B);
+
+  tft.fillRect(44, 114, 40, 1, 0xE73B);  // hairline
+  smallTrackedAt(tft, "VEHICLE HEALTH", 126, 0, 0x63DB);
+
+  for (int16_t i = 0; i <= 128; i += 4) { // phone-style loading line
+    tft.fillRect(0, 152, i, 2, 0x0BCA);
+    delay(40);
+  }
+  delay(150);
+
+  // ---------- stage 2: KOLLS AUTOTRONICS ----------
+  tft.fillScreen(0xF7BE);
+  buzzerChirp(200, 0);                    // company screen chime
+  tft.fillRect(48, 42, 32, 3, 0x0BCA);    // accent tab
+  const char* ko = "KOLLS";
+  const int16_t ktrack = 4;
+  tft.setFont(F9B);
+  tft.setTextSize(1);
+  tft.getTextBounds(ko, 0, 0, &bx, &by, &bw, &bh);
+  int16_t kw = (int16_t)bw + ktrack * (int16_t)(strlen(ko) - 1);
+  gfxTrackedAt(tft, ko, (128 - kw) / 2 - bx, 84, ktrack, 0x10A2, F9B);
+
+  smallTrackedAt(tft, "AUTOTRONICS", 100, 2, 0x0BCA);
+
+  tft.fillRect(44, 118, 40, 1, 0xE73B);   // hairline
+  delay(1400);
+}
 #endif
 
 // ==============================================================================================
@@ -264,9 +587,12 @@ void setup() {
   Serial.printf("[INIT] Vehicle ID: %s | Free heap: %u bytes\n", VEHICLE_ID, ESP.getFreeHeap());
 
 #if USE_TFT
-  tft.initR(INITR_BLACKTAB);
-  tft.setRotation(0);
-  displayBootScreen();
+  tft.initR(INITR_BLACKTAB);  // red 1.4" module: ST7735S, 128x160
+  tft.setRotation(0);         // native portrait: 128 wide x 160 tall
+  tft.setSPISpeed(12000000);  // conservative: full 34 KB page bursts over dupont wires
+  tft.fillScreen(0xF7BE);     // T_BG
+  buzzerInit();
+  bootSplash();               // ORION X -> KOLLS AUTOTRONICS -> main UI
 #endif
 
 #if DEVICE_BATT_MONITOR
@@ -274,6 +600,14 @@ void setup() {
 #endif
 
   connectWiFi();
+
+  // ---- OTA: Arduino IDE > Tools > Port > "kolls-gw at ..." (password below) ----
+  ArduinoOTA.setHostname("kolls-gw");
+  ArduinoOTA.setPassword("kolls2026");
+  ArduinoOTA.onStart([]() { Serial.println(F("[OTA] Update starting...")); });
+  ArduinoOTA.onEnd  ([]() { Serial.println(F("[OTA] Done, rebooting")); });
+  ArduinoOTA.begin();
+  Serial.printf("[OTA] ArduinoOTA ready: http://kolls-gw.local  (password kolls2026)\n");
 
   snprintf(mqttCmdTopic, sizeof(mqttCmdTopic), MQTT_CMD_FMT, VEHICLE_ID);
   snprintf(mqttAppTopic, sizeof(mqttAppTopic), MQTT_APP_FMT, VEHICLE_ID);
@@ -322,6 +656,18 @@ void setup() {
   device.obd_detached    = false;
   device.disconnect_count = 0;
   device.everSawOBD      = false;
+
+  location.valid        = false;
+  location.lat          = 0.0;
+  location.lon          = 0.0;
+  location.speed_kmh    = 0.0f;
+  location.alt_m        = 0.0f;
+  location.sats         = 0;
+  location.fix          = 0;
+  location.updated_ms   = 0;
+  strncpy(location.source, "none", sizeof(location.source) - 1);
+  strncpy(location.city, "-", sizeof(location.city) - 1);
+  strncpy(location.country, "-", sizeof(location.country) - 1);
 
 #if USE_TFT
   tft.fillScreen(COLOR_BLACK);
@@ -376,6 +722,9 @@ void loop() {
   // 6. Device battery fuel gauge
   updateDeviceBattery();
 
+  // 6b. Location (IP geo-lookup + app-pushed GPS fix)
+  updateLocation();
+
   // 7. If the bus went fully silent, run the bench-simulation engine instead
   telemetry.using_sim_data = (now - lastCANMsgTime > CAN_TIMEOUT_MS);
   if (telemetry.using_sim_data) {
@@ -401,16 +750,22 @@ void loop() {
   }
 
 #if USE_TFT
-  // 10. Critical-state pinned-footer strobe (the carousel freezes via uiTick)
+  // 10. Critical-state pinned-strip redraw (the strip itself floods red in drawStrip)
   if (telemetry.severity == 2 && (now - lastFlashToggle >= 350)) {
     lastFlashToggle = now;
     flashState = !flashState;
-    drawFooter(true);
+    drawStrip();
   }
 #endif
 
   // 11. Direct-connect HTTP server (demo path - serves the dashboard + JSON API)
   httpServer.handleClient();
+
+  // 12. OTA firmware uploads (WiFi)
+  ArduinoOTA.handle();
+
+  // 13. Buzzer: boot chirps are done, now alert patterns only
+  buzzerTick(millis());
 
   yield();
 }
@@ -628,25 +983,19 @@ void simulateCANData() {
   telemetry.stft = (sin((float)(now % 8000) / 8000.0f * 2.0f * PI) * 2.5f) + ((float)random(-8, 9) / 10.0f);
   telemetry.ltft = (cos((float)(now % 24000) / 24000.0f * 2.0f * PI) * 1.5f);
   telemetry.intake_air_temp = 29.5f + (sin((float)(now % 45000) / 45000.0f * 2.0f * PI) * 3.0f);
-
-  // Bench-demo anomalies (only while the simulator feeds data - never when hardware CAN is live)
-  unsigned long cycleSec = (now / 1000) % 75;
-  if (cycleSec >= 30 && cycleSec < 36) {
-    telemetry.coolant_temp = 103.8f;
-    telemetry.status       = "COOLANT OVERHEAT";
-    telemetry.severity     = 1;
-  } else if (cycleSec >= 60 && cycleSec < 66) {
-    telemetry.rpm         = 4650;
-    telemetry.engine_load = 88;
-    telemetry.status      = "HIGH ENGINE STRESS";
-    telemetry.severity    = 1;
-  }
 }
 
 // ==============================================================================================
 //                                 HEALTH EVALUATION
 // ==============================================================================================
 void evaluateSystemHealth() {
+  // Bench simulation: plausible values only, never alarm states
+  if (telemetry.using_sim_data && !device.everSawOBD) {
+    telemetry.status   = "BENCH SIM";
+    telemetry.severity = 0;
+    return;
+  }
+
   // Priority 0: latched OBD unplug alert (cleared only by data returning)
   if (device.obd_detached) {
     telemetry.status   = "OBD DETACHED";
@@ -832,6 +1181,15 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     telemetry.tamper_detected = false;
     telemetry.status        = "NOMINAL";
     Serial.println(F("[SECURITY] OBD detach latch cleared via remote command."));
+  } else if (strstr(buf, "\"action\":\"buzzer\"") != NULL || strstr(buf, "BUZZER") != NULL) {
+    // App/fleet "Sound Orion X": { "action":"buzzer", "ms":900 }
+    buzzerPulse(900);
+    mqttClient.publish(MQTT_TOPIC, "{\"response\":\"BUZZER\",\"status\":\"ON\"}");
+  } else if (strstr(buf, "\"lat\"") != NULL || strstr(buf, "\"action\":\"location\"") != NULL) {
+    // Browser-pushed GPS fix: { "action":"location", "lat":.., "lon":.., "sats":.. }
+    if (applyAppLocation(buf)) {
+      publishAppPayload();      // echo the new position immediately
+    }
   }
 }
 
@@ -892,6 +1250,23 @@ void publishTelemetry() {
 #if DEVICE_BATT_MONITOR
   diag["device_low"]       = device.device_low;
 #endif
+
+  // ---- location (raw topic mirror) -----------------------------------------
+#if ARDUINOJSON_VERSION_MAJOR >= 7
+  JsonObject locRaw = doc["location"].to<JsonObject>();
+#else
+  JsonObject locRaw = doc.createNestedObject("location");
+#endif
+  locRaw["source"]    = location.valid ? location.source : "none";
+  locRaw["lat"]       = location.valid ? location.lat : 0.0;
+  locRaw["lon"]       = location.valid ? location.lon : 0.0;
+  locRaw["city"]      = location.city;
+  locRaw["country"]   = location.country;
+  locRaw["speed_kmh"] = location.speed_kmh;
+  locRaw["alt_m"]     = location.alt_m;
+  locRaw["sats"]      = location.sats;
+  locRaw["fix"]       = location.fix;
+  locRaw["age_s"]     = location.valid ? (uint32_t)((millis() - location.updated_ms) / 1000) : 0;
 
   char jsonBuffer[640];
   size_t bytesWritten = serializeJson(doc, jsonBuffer, sizeof(jsonBuffer));
@@ -959,6 +1334,23 @@ size_t buildAppJson(char* out, size_t outLen) {
   doc["severity"] = telemetry.severity;
   doc["tone"]     = telemetry.severity == 2 ? "danger" : (telemetry.severity == 1 ? "warn" : "good");
 
+  // ---- location -------------------------------------------------------------
+#if ARDUINOJSON_VERSION_MAJOR >= 7
+  JsonObject loc = doc["location"].to<JsonObject>();
+#else
+  JsonObject loc = doc.createNestedObject("location");
+#endif
+  loc["source"]    = location.valid ? location.source : "none";
+  loc["lat"]       = location.valid ? location.lat : 0.0;
+  loc["lon"]       = location.valid ? location.lon : 0.0;
+  loc["city"]      = location.city;
+  loc["country"]   = location.country;
+  loc["speed_kmh"] = location.speed_kmh;
+  loc["alt_m"]     = location.alt_m;
+  loc["sats"]      = location.sats;
+  loc["fix"]       = location.fix;
+  loc["age_s"]     = location.valid ? (uint32_t)((millis() - location.updated_ms) / 1000) : 0;
+
   // ---- gateway (node) telemetry --------------------------------------------
 #if ARDUINOJSON_VERSION_MAJOR >= 7
   JsonObject gw = doc["gateway"].to<JsonObject>();
@@ -1002,6 +1394,7 @@ void publishAppPayload() {
 void handleRoot();
 void handleTelemetry();
 void handleHealth();
+void handleBuzzer();
 void sendCORS();
 
 void sendCORS() {
@@ -1016,6 +1409,12 @@ void handleTelemetry() {
   buildAppJson(buf, sizeof(buf));
   sendCORS();
   httpServer.send(200, "application/json", String(buf));
+}
+
+void handleBuzzer() {
+  buzzerPulse(900);
+  sendCORS();
+  httpServer.send(200, "application/json", "{\"ok\":true}");
 }
 
 void handleHealth() {
@@ -1055,21 +1454,21 @@ void handleRoot() {
  footer{margin-top:14px;font-size:10px;color:#475569;display:flex;gap:14px;flex-wrap:wrap}
  #st{position:fixed;top:10px;right:12px;font-size:10px;color:#64748b}
 </style></head><body>
-<div id="st">connecting…</div>
-<h1>⚡ KOLLS AUTOTRONICS — LIVE NODE</h1>
+<div id="st">connecting?</div>
+<h1>? KOLLS AUTOTRONICS ? LIVE NODE</h1>
 <div class="sub" id="hd">Kolls Autotronics Test Vehicle</div>
 <div class="grid">
- <div class="card"><div class="lbl">Engine speed</div><div class="val" id="rpm">—<span class="unit">rpm</span></div>
+ <div class="card"><div class="lbl">Engine speed</div><div class="val" id="rpm">?<span class="unit">rpm</span></div>
   <div class="bar"><div class="fill c" id="rpmf" style="width:0%"></div></div></div>
- <div class="card"><div class="lbl">Coolant</div><div class="val" id="ct">—<span class="unit">°C</span></div>
+ <div class="card"><div class="lbl">Coolant</div><div class="val" id="ct">?<span class="unit">?C</span></div>
   <div class="bar"><div class="fill g" id="ctf" style="width:0%"></div></div></div>
- <div class="card"><div class="lbl">System voltage</div><div class="val" id="bv">—<span class="unit">V</span></div>
+ <div class="card"><div class="lbl">System voltage</div><div class="val" id="bv">?<span class="unit">V</span></div>
   <div class="bar"><div class="fill g" id="bvf" style="width:0%"></div></div></div>
- <div class="card"><div class="lbl">Engine load</div><div class="val" id="ld">—<span class="unit">%</span></div>
+ <div class="card"><div class="lbl">Engine load</div><div class="val" id="ld">?<span class="unit">%</span></div>
   <div class="bar"><div class="fill c" id="ldf" style="width:0%"></div></div></div>
- <div class="card"><div class="lbl">Health score</div><div class="val g" id="sc">—<span class="unit">/100</span></div>
+ <div class="card"><div class="lbl">Health score</div><div class="val g" id="sc">?<span class="unit">/100</span></div>
   <div class="bar"><div class="fill g" id="scf" style="width:0%"></div></div></div>
- <div class="card"><div class="lbl">Gateway pack</div><div class="val" id="dv">—<span class="unit">%</span></div>
+ <div class="card"><div class="lbl">Gateway pack</div><div class="val" id="dv">?<span class="unit">%</span></div>
   <div class="bar"><div class="fill g" id="dvf" style="width:0%"></div></div></div>
 </div>
 <footer><span id="f1"></span><span id="f2"></span><span id="f3"></span><span id="low"></span></footer>
@@ -1079,11 +1478,11 @@ function set(id,v,cls){const e=q(id);e.className='val '+(cls||'');e.innerHTML=v;
 async function tick(){
  try{
   const d=await (await fetch('/telemetry',{cache:'no-store'})).json();
-  const n=v=>v===null||v===undefined?'—':v;
+  const n=v=>v===null||v===undefined?'?':v;
   set('rpm',n(d.rpm)+'<span class="unit">rpm</span>',d.rpm>4500?'r':d.rpm>3000?'y':'');
   q('rpmf').style.width=Math.min(100,d.rpm/6000*100)+'%';
   q('rpmf').style.background=d.rpm>4500?'#f87171':d.rpm>3000?'#fbbf24':'#22d3ee';
-  set('ct',n(d.coolant)+'<span class="unit">°C</span>',+d.coolant>=100?'r':+d.coolant>=90?'y':'g');
+  set('ct',n(d.coolant)+'<span class="unit">?C</span>',+d.coolant>=100?'r':+d.coolant>=90?'y':'g');
   q('ctf').style.width=Math.min(100,Math.max(0,(d.coolant-60)/60*100))+'%';
   set('bv',n(d.battery)+'<span class="unit">V</span>',+d.battery<11.8?'r':+d.battery<=12.4?'y':'g');
   q('bvf').style.width=Math.min(100,Math.max(0,(d.battery-11)/4*100))+'%';
@@ -1091,17 +1490,17 @@ async function tick(){
   q('ldf').style.width=(d.load_pct||0)+'%';
   set('sc',n(d.score),d.score>=80?'g':d.score>=60?'y':'r');
   q('scf').style.width=n(d.score)+'%';
-  set('dv',(d.gateway?d.gateway.device_pct:'—')+'<span class="unit">%</span>',d.gateway&&d.gateway.device_pct<20?'r':'');
+  set('dv',(d.gateway?d.gateway.device_pct:'?')+'<span class="unit">%</span>',d.gateway&&d.gateway.device_pct<20?'r':'');
   q('dvf').style.width=(d.gateway?d.gateway.device_pct:0)+'%';
   q('dvf').style.background=(d.gateway&&d.gateway.device_pct<20)?'#f87171':'#4ade80';
   const low=d.gateway&&d.gateway.device_pct<20;
-  q('low').textContent=low?'⚠ LOW BATTERY — CHARGE THE GATEWAY':'';
+  q('low').textContent=low?'? LOW BATTERY ? CHARGE THE GATEWAY':'';
   q('low').style.color='#f87171';
-  q('hd').textContent=(d.name||'')+' · '+(d.vehicle_id||'');
-  q('f1').textContent='FEED: '+(d.gateway?d.gateway.can_feed:'—');
-  q('f2').textContent='STATUS: '+(d.status||'—');
+  q('hd').textContent=(d.name||'')+' ? '+(d.vehicle_id||'');
+  q('f1').textContent='FEED: '+(d.gateway?d.gateway.can_feed:'?');
+  q('f2').textContent='STATUS: '+(d.status||'?');
   q('f3').textContent='OBD: '+(d.gateway&&d.gateway.obd_detached?'DETACHED':'connected');
-  q('st').textContent='live · '+(d.gateway?d.gateway.ip:'');
+  q('st').textContent='live ? '+(d.gateway?d.gateway.ip:'');
  }catch(e){q('st').textContent='device offline'}
 }
 tick();setInterval(tick,1000);
@@ -1115,6 +1514,8 @@ void startHttpServer() {
   httpServer.on("/", HTTP_GET, handleRoot);
   httpServer.on("/telemetry", HTTP_GET, handleTelemetry);
   httpServer.on("/health", HTTP_GET, handleHealth);
+  httpServer.on("/buzzer", HTTP_GET, handleBuzzer);
+  httpServer.on("/buzzer", HTTP_POST, handleBuzzer);
   httpServer.onNotFound(handleHealth);
   httpServer.begin();
   Serial.println(F("[HTTP] Direct-connect server started on port 80."));
@@ -1147,456 +1548,588 @@ void printTelemetrySerial() {
 }
 
 // ==============================================================================================
-//                                 TFT DISPLAY (ST7735)
+//            TFT DISPLAY (128x160 portrait) - LIGHT THEME, MOCKUP PORT
+// ==============================================================================================
+// Panel: red 1.4" module, ST7735S controller, 128x160, INITR_BLACKTAB, rotation 0.
+// Ported from docs/tft-mockup-1.4.html, re-laid-out for 128x160 (the mockup's 240 px
+// height does not exist on this glass):
+//   fault band   y 0..16      label y 20     hero(size 4) y 36    rule y 72
+//   3 icon rows  y 76, 94, 112  (18 px pitch, size-2 mono, <= 8 chars)
+//   pinned strip y 134..160 (never scrolls)
+//   severity bar x 0..3, full height
+// 5 pages: DRIVE - THERMAL - POWER - HEALTH - LINK. Hold 4.2 s, glide 1.6 s.
 // ==============================================================================================
 #if USE_TFT
 
-void displayBootScreen() {
-  tft.fillScreen(COLOR_BLACK);
-  tft.setTextWrap(false);
+// ---- panel geometry / colours -----------------------------------------------
+#define TFT_PANEL_W   128
+#define TFT_PANEL_H   160
+#define TFT_VIEW_H    134     // scrolling viewport; strip owns y 134..160
+#define TFT_ROTATION  0       // native portrait on the ST7735S 128x160 panel
 
-  tft.setTextColor(COLOR_CYAN);
-  tft.setTextSize(3);
-  tft.setCursor(18, 24);
-  tft.print(F("KOLLS"));
+#define T_BG      0xF7BE      // #f4f4f1
+#define T_SURF    0xFFFF      // #ffffff
+#define T_INK     0x10A2      // #151614
+#define T_MUTED   0x63DB      // #64665f
+#define T_LINE    0xE73B      // #e4e4dd
+#define T_TRACK   0xEF7D      // #efefea
+#define T_DOTOFF  0xD699      // #d3d3ca
+#define T_ACCENT  0x0BCA      // #0b7a53
+#define T_WARN    0x8A80      // #8a5200
+#define T_DANGER  0x9944      // #9e2a21
+#define T_BLUE    0x2B76      // #2b76b0
+#define T_SKY     0x7D9A      // #7fb3d5
+#define T_AMBER   0xE504      // #e0a021
+#define T_STEEL   0x8C71      // #8a8d86
+#define T_WHITE   0xFFFF
 
-  tft.setTextColor(COLOR_WHITE);
-  tft.setTextSize(1);
-  tft.setCursor(29, 52);
-  tft.print(F("AUTOTRONICS"));
+#define ROW_Y0    76
+#define ROW_PITCH 18
+#define ROW_COUNT 3
 
-  tft.drawFastHLine(14, 66, 100, COLOR_KOLLS_BLUE);
-
-  tft.setTextColor(COLOR_GRAY);
-  tft.setCursor(6, 76);
-  tft.print(F("Battery CAN Node v2.0"));
-
-  const int16_t barX = 14, barY = 104, barW = 100, barH = 10;
-  tft.drawRect(barX, barY, barW, barH, COLOR_WHITE);
-  for (int16_t i = 0; i <= (barW - 4); i += 4) {
-    tft.fillRect(barX + 2, barY + 2, i, barH - 4, COLOR_CYAN);
-    delay(25);
-  }
-
-  tft.setTextColor(COLOR_GRAY);
-  tft.setCursor(18, 134);
-  tft.print(F("Battery Edition IoT"));
-  delay(900);
-}
-
-// ==============================================================================================
-//           TFT DISPLAY (ST7735) - PROFESSIONAL CAROUSEL UI / INFINITE SCROLL
-// ==============================================================================================
-// Design system (small-screen automotive HMI rules):
-//   - Screen split: 120px scrollable viewport + 40px PINNED status footer (never scrolls).
-//   - ONE story per page: label-left / value-right grid, hero numerics on page 1.
-//   - Color = status only: GREEN nominal, YELLOW attention, RED danger, CYAN brand.
-//   - 3-page infinite auto-scroll: HOLD 2.6s -> smooth 700ms downward glide -> wraps forever.
-//   - Double-buffered (2x 30KB RAM canvases): zero flicker, zero torn frames.
-//   - CRITICAL severity freezes the carousel and strobes the pinned footer.
-// ==============================================================================================
-
-const unsigned long UI_HOLD_MS    = 2600;   // ms a page rests before scrolling on
-const unsigned long UI_GLIDE_MS   = 700;    // ms scroll animation duration
-const uint8_t       UI_PAGE_COUNT = 4;      // pages in the endless cycle
-
-GFXcanvas16* pageCanvas = NULL;    // page currently displayed
-GFXcanvas16* nextCanvas = NULL;    // page being scrolled into
+// ---- carousel state ---------------------------------------------------------
+GFXcanvas16* pageCanvas = NULL;
+GFXcanvas16* nextCanvas = NULL;
 bool          canvasOk       = false;
 uint8_t       currPage       = 0;
 bool          uiAnimating    = false;
+bool          uiCalm         = false;
 unsigned long pageHoldStart  = 0;
 unsigned long uiAnimStart    = 0;
-int16_t       lastAnimOff    = -1;
+unsigned long calmLastDraw   = 0;
+unsigned long lastLiveDraw   = 0;
 
-String  lastFooterStatus = "";
-uint8_t lastFooterSev    = 255;
-bool    lastFooterFlash  = false;
+// ==============================================================================================
+// helpers
+// ==============================================================================================
+uint16_t sevColorHex(uint8_t s)  { return s == 0 ? T_ACCENT : (s == 1 ? T_WARN : T_DANGER); }
+uint16_t rpmColorOf(uint16_t r)  { return r >= 4500 ? T_DANGER : (r >= 3000 ? T_WARN : T_INK); }
+uint16_t coolColorOf(float t)    { return t >= 100.0f ? T_DANGER : (t >= 90.0f ? T_WARN : T_INK); }
+uint16_t voltColorOf(float v)    { return v < 11.8f ? T_DANGER : (v <= 12.4f ? T_WARN : T_INK); }
+uint16_t trimColorOf(float t)    { return fabsf(t) > 8.0f ? T_DANGER : (fabsf(t) > 5.0f ? T_WARN : T_ACCENT); }
+uint16_t scoreColorOf(uint8_t s) { return s >= 80 ? T_ACCENT : (s >= 60 ? T_WARN : T_DANGER); }
 
-// ------------------------------------------------------------- status colors
-float clampF(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
-
-uint16_t coolantColorFor(float c) {
-  if (c >= 100.0f) return COLOR_RED;
-  if (c >= 90.0f)  return COLOR_YELLOW;
-  return COLOR_GREEN;
-}
-
-uint16_t voltColorFor(float v) {
-  if (v < 11.8f)  return COLOR_RED;
-  if (v <= 12.4f) return COLOR_YELLOW;
-  return COLOR_GREEN;
-}
-
+// the single worst fault (<= 9 chars, no "!" prefix so it fits 128 px) ??? mockup's ladder
+const char* uiFault(uint16_t* color) {
+  // Bench simulation must never raise alarms - no car, no faults.
+  if (telemetry.using_sim_data && !device.everSawOBD) return NULL;
 #if DEVICE_BATT_MONITOR
-uint16_t packColorFor(float v) {
-  if (v < DEVICE_BATT_CRIT_V) return COLOR_RED;
-  if (v < DEVICE_BATT_WARN_V) return COLOR_YELLOW;
-  return COLOR_GREEN;
-}
+  if (device.connected && device.device_critical) { *color = T_DANGER; return "LOW BATT"; }
 #endif
-
-uint16_t trimColorFor(float t) {
-  float a = fabsf(t);
-  if (a > 8.0f) return COLOR_RED;
-  if (a > 5.0f) return COLOR_YELLOW;
-  return COLOR_GREEN;
+  if (device.obd_detached)              { *color = T_DANGER; return "CAN LOST";  }
+  if (telemetry.oil_temp >= 110.0f)     { *color = T_DANGER; return "OIL HOT";   }
+  if (telemetry.coolant_temp >= 100.0f) { *color = T_DANGER; return "OVERHEAT";  }
+  if (telemetry.battery_voltage < 11.8f){ *color = T_DANGER; return "LOW VOLT";  }
+  if (telemetry.rpm >= 4500)            { *color = T_DANGER; return "OVER-REV";  }
+  if (fabsf(telemetry.stft) > 8.0f ||
+      fabsf(telemetry.ltft) > 8.0f)     { *color = T_DANGER; return "TRIM HI";   }
+  if (telemetry.engine_load > 80)       { *color = T_WARN;   return "HIGH LOAD"; }
+  if (telemetry.coolant_temp >= 90.0f)  { *color = T_WARN;   return "RUN HOT";   }
+  if (fabsf(telemetry.stft) > 5.0f ||
+      fabsf(telemetry.ltft) > 5.0f)     { *color = T_WARN;   return "TRIM WARN"; }
+  if (telemetry.severity == 2)          { *color = T_DANGER; return "CRITICAL";  }
+  if (telemetry.severity == 1)          { *color = T_WARN;   return "WARNING";   }
+  return NULL;
 }
 
-int8_t wifiBarsFor(int16_t rssi) {
-  if (rssi == 0 || rssi <= -100) return 0;
-  if (rssi >= -55) return 4;
-  if (rssi >= -67) return 3;
-  if (rssi >= -78) return 2;
-  return 1;
-}
+// ==============================================================================================
+// ICONS (GFX primitives only ??? mirror the mockup SVGs)
+// ==============================================================================================
+// --- 16x16 1-bit glyphs, generated from icons.txt (MSB first) -----------------
+static const uint8_t ICO_THERM[32] PROGMEM = {
+  0x00, 0x00, 0x03, 0x80, 0x03, 0x80, 0x03, 0x90,
+  0x03, 0x90, 0x03, 0x80, 0x03, 0x90, 0x03, 0x90,
+  0x03, 0x80, 0x07, 0xC0, 0x0F, 0xE0, 0x1F, 0xF0,
+  0x1F, 0xF0, 0x0F, 0xE0, 0x07, 0xC0, 0x00, 0x00
+};
+static const uint8_t ICO_BATT[32] PROGMEM = {
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7F, 0xF8,
+  0x7F, 0xF8, 0x60, 0x1B, 0x60, 0x1B, 0x60, 0x1B,
+  0x60, 0x1B, 0x7F, 0xF8, 0x7F, 0xF8, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+static const uint8_t ICO_BOLT[32] PROGMEM = {
+  0x00, 0x00, 0x00, 0xE0, 0x01, 0xE0, 0x03, 0xC0,
+  0x07, 0x80, 0x0F, 0x00, 0x1F, 0xC0, 0x03, 0xC0,
+  0x07, 0x80, 0x0F, 0x00, 0x1E, 0x00, 0x3C, 0x00,
+  0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+static const uint8_t ICO_RING[32] PROGMEM = {
+  0x00, 0x00, 0x07, 0xE0, 0x1C, 0x38, 0x30, 0x0C,
+  0x60, 0x06, 0x40, 0x02, 0xC0, 0x03, 0x80, 0x01,
+  0x80, 0x01, 0xC0, 0x03, 0x40, 0x02, 0x60, 0x06,
+  0x30, 0x0C, 0x1C, 0x38, 0x07, 0xE0, 0x00, 0x00
+};
+static const uint8_t ICO_DROP[32] PROGMEM = {
+  0x00, 0x00, 0x01, 0x80, 0x03, 0xC0, 0x03, 0xC0,
+  0x07, 0xE0, 0x0F, 0xF0, 0x0F, 0xF0, 0x1F, 0xF8,
+  0x1F, 0xF8, 0x1F, 0xF8, 0x3F, 0xFC, 0x3F, 0xFC,
+  0x1F, 0xF8, 0x0F, 0xF0, 0x07, 0xE0, 0x00, 0x00
+};
+static const uint8_t ICO_CAN[32] PROGMEM = {
+  0x00, 0x00, 0x00, 0x00, 0x3F, 0xF8, 0x7F, 0xFC,
+  0x6D, 0xB4, 0x7F, 0xFC, 0x3F, 0xF8, 0x1F, 0xF0,
+  0x0F, 0xE0, 0x07, 0xC0, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+static const uint8_t ICO_CLOUD[32] PROGMEM = {
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x03, 0xC0, 0x0F, 0xF0, 0x1F, 0xFC, 0x3F, 0xFE,
+  0x7F, 0xFE, 0x7F, 0xFE, 0x7F, 0xFE, 0x3F, 0xFC,
+  0x1F, 0xF8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+static const uint8_t ICO_SHIELD[32] PROGMEM = {
+  0x00, 0x00, 0x1F, 0xF8, 0x3F, 0xFC, 0x3F, 0xFC,
+  0x3F, 0xFC, 0x3F, 0xFC, 0x3F, 0xFC, 0x1F, 0xF8,
+  0x0F, 0xF0, 0x07, 0xE0, 0x03, 0xC0, 0x01, 0x80,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
 
-// ---------------------------------------------------------- draw primitives
-void uiTitle(Adafruit_GFX& g, const char* title, uint8_t pageIdx) {
-  g.setTextWrap(false);
-  g.setTextColor(COLOR_CYAN);
-  g.setTextSize(1);
-  g.setCursor(4, 6);
-  g.print(title);
-
-  // carousel position dots
-  for (uint8_t i = 0; i < UI_PAGE_COUNT; i++) {
-    int16_t x = 116 - (int16_t)(UI_PAGE_COUNT - 1 - i) * 9;
-    if (i == pageIdx) g.fillCircle(x, 10, 2, COLOR_CYAN);
-    else              g.drawCircle(x, 10, 2, COLOR_GRAY);
-  }
-  g.drawFastHLine(0, 19, 128, COLOR_KOLLS_BLUE);
-}
-
-void uiLabel(Adafruit_GFX& g, int16_t x, int16_t y, const char* txt) {
-  g.setTextColor(COLOR_GRAY);
-  g.setTextSize(1);
-  g.setCursor(x, y);
-  g.print(txt);
-}
-
-void uiValue(Adafruit_GFX& g, int16_t right, int16_t y, const char* txt,
-             uint8_t size, uint16_t color) {
-  g.setTextColor(color);
-  g.setTextSize(size);
-  g.setCursor(right - (int16_t)(strlen(txt) * 6 * size), y);
-  g.print(txt);
-}
-
-void uiRow(Adafruit_GFX& g, int16_t y, const char* label, const char* value, uint16_t color) {
-  uiLabel(g, 4, y, label);
-  uiValue(g, 124, y, value, 2, color);
-  g.drawFastHLine(0, y + 20, 128, COLOR_DARK_GRAY);
-}
-
-void uiCentered(Adafruit_GFX& g, int16_t y, const char* txt, uint8_t size, uint16_t color) {
-  int16_t x = (128 - (int16_t)(strlen(txt) * 6 * size)) / 2;
-  if (x < 0) x = 0;
-  g.setTextColor(color);
-  g.setTextSize(size);
-  g.setCursor(x, y);
-  g.print(txt);
-}
-
-void uiBar(Adafruit_GFX& g, int16_t x, int16_t y, int16_t w, float pct01, uint16_t color) {
-  g.drawRect(x, y, w, 7, COLOR_DARK_GRAY);
-  g.fillRect(x + 2, y + 2, (int16_t)(clampF(pct01, 0.0f, 1.0f) * (w - 5) + 0.5f), 3, color);
-}
-
-void uiSignedBar(Adafruit_GFX& g, int16_t x, int16_t y, int16_t w, float pct, uint16_t color) {
-  g.drawRect(x, y, w, 7, COLOR_DARK_GRAY);
-  int16_t cx = x + w / 2;
-  g.drawFastVLine(cx, y, 7, COLOR_WHITE);
-  int16_t off = (int16_t)(clampF(pct / 10.0f, -1.0f, 1.0f) * ((w / 2) - 3));
-  if (off >= 0) g.fillRect(cx + 1, y + 2, off, 3, color);
-  else          g.fillRect(cx + off, y + 2, -off, 3, color);
-}
-
-void uiBatteryIcon(Adafruit_GFX& g, int16_t x, int16_t y, float pct01, uint16_t color) {
-  g.drawRect(x, y, 22, 12, COLOR_WHITE);
-  g.fillRect(x + 23, y + 3, 2, 6, COLOR_WHITE);
-  g.fillRect(x + 2, y + 2, (int16_t)(clampF(pct01, 0.0f, 1.0f) * 18 + 0.5f), 8, color);
-}
-
-void uiWifiIcon(Adafruit_GFX& g, int16_t x, int16_t y, uint8_t bars) {
-  for (int16_t i = 0; i < 4; i++) {
-    int16_t h = 3 + i * 3;
-    uint16_t col = i < (int16_t)bars ? COLOR_GREEN : COLOR_DARK_GRAY;
-    g.fillRect(x + i * 4, y + 12 - h, 3, h, col);
+void icoTherm(Adafruit_GFX& g, int16_t x, int16_t y, uint16_t c) {
+  bool mono = (c == T_WHITE);
+  g.drawBitmap(x, y, ICO_THERM, 16, 16, mono ? T_WHITE : T_INK);
+  if (!mono) {
+    g.fillRect(x + 7, y + 3, 1, 6, T_DANGER);          // mercury column
+    g.fillCircle(x + 8, y + 12, 2, T_DANGER);          // red bulb
   }
 }
-
-// --------------------------------------------------------- PAGE 0 : HERO / GLANCE
-void renderPage0(Adafruit_GFX& g) {
-  g.fillScreen(COLOR_BLACK);
-  uiTitle(g, "KOLLS", 0);
-
-  uiLabel(g, 4, 24, "ENGINE SPEED");
-  char buf[10];
-  snprintf(buf, sizeof(buf), "%u", telemetry.rpm);
-  uiValue(g, 124, 33, buf, 3,
-          telemetry.rpm >= 4500 ? COLOR_RED : (telemetry.rpm >= 3000 ? COLOR_YELLOW : COLOR_WHITE));
-
-  // RPM range bar 0-6000 with redline tick at 4500
-  uiBar(g, 4, 60, 114, telemetry.rpm / 6000.0f,
-        telemetry.rpm >= 4500 ? COLOR_RED : COLOR_CYAN);
-  int16_t rl = 4 + (int16_t)(4500.0f / 6000.0f * 114.0f);
-  g.drawFastVLine(rl, 58, 11, COLOR_RED);
-  uiLabel(g, 4, 70, "0");
-  uiLabel(g, 110, 70, "6K");
-
-  // twin data cards: coolant / oil
-  g.drawRect(2, 82, 62, 22, COLOR_DARK_GRAY);
-  uiLabel(g, 4, 84, "COOL");
-  snprintf(buf, sizeof(buf), "%.1f", telemetry.coolant_temp);
-  uiValue(g, 62, 84, buf, 1, coolantColorFor(telemetry.coolant_temp));
-
-  g.drawRect(66, 82, 62, 22, COLOR_DARK_GRAY);
-  uiLabel(g, 68, 84, "OIL");
-  snprintf(buf, sizeof(buf), "%.1f", telemetry.oil_temp);
-  uiValue(g, 126, 84, buf, 1, COLOR_WHITE);
-
-  // compact bottom row: vehicle voltage + intake air
-  uiLabel(g, 4, 108, "VOLT");
-  snprintf(buf, sizeof(buf), "%.1f", telemetry.battery_voltage);
-  uiValue(g, 56, 108, buf, 1, voltColorFor(telemetry.battery_voltage));
-  uiLabel(g, 68, 108, "IAT");
-  snprintf(buf, sizeof(buf), "%.1f", telemetry.intake_air_temp);
-  uiValue(g, 124, 108, buf, 1, COLOR_WHITE);
+void icoBatt(Adafruit_GFX& g, int16_t x, int16_t y, uint16_t c, uint8_t pct) {
+  bool mono = (c == T_WHITE);
+  g.drawBitmap(x, y, ICO_BATT, 16, 16, mono ? T_WHITE : T_INK);
+  if (!mono) {
+    int16_t w = (int16_t)((8L * pct) / 100);            // interior is 8 px wide
+    if (w > 0) g.fillRect(x + 3, y + 5, w, 4, pct < 20 ? T_DANGER : T_ACCENT);
+  }
+}
+void icoBolt(Adafruit_GFX& g, int16_t x, int16_t y, uint16_t c) {
+  g.drawBitmap(x, y, ICO_BOLT, 16, 16, c == T_WHITE ? T_WHITE : T_AMBER);
+}
+void icoGauge(Adafruit_GFX& g, int16_t x, int16_t y, uint16_t c) {
+  bool mono = (c == T_WHITE);
+  g.drawBitmap(x, y, ICO_RING, 16, 16, mono ? T_WHITE : T_INK);
+  g.drawLine(x + 8, y + 8, x + 11, y + 4, mono ? T_WHITE : T_DANGER);
+  g.drawLine(x + 8, y + 9, x + 11, y + 5, mono ? T_WHITE : T_DANGER);
+  g.fillCircle(x + 8, y + 8, 2, mono ? T_WHITE : T_AMBER);
+}
+void icoDrop(Adafruit_GFX& g, int16_t x, int16_t y, uint16_t c) {
+  bool mono = (c == T_WHITE);
+  g.drawBitmap(x, y, ICO_DROP, 16, 16, mono ? T_WHITE : T_BLUE);
+  if (!mono) g.fillCircle(x + 6, y + 8, 1, T_SKY);      // highlight
+}
+void icoCan(Adafruit_GFX& g, int16_t x, int16_t y, uint16_t c) {
+  g.drawBitmap(x, y, ICO_CAN, 16, 16, c);              // live=green, lost=red
+}
+void icoLink(Adafruit_GFX& g, int16_t x, int16_t y, uint16_t c) {
+  bool mono = (c == T_WHITE);
+  g.drawBitmap(x, y, ICO_CLOUD, 16, 16, mono ? T_WHITE : T_BLUE);
+  if (!mono) g.fillRect(x + 5, y + 7, 3, 2, T_SKY);     // cloud highlight
+}
+void icoShield(Adafruit_GFX& g, int16_t x, int16_t y, uint16_t c) {
+  bool mono = (c == T_WHITE);
+  g.drawBitmap(x, y, ICO_SHIELD, 16, 16, mono ? T_WHITE : T_ACCENT);
+  if (!mono) {
+    g.drawLine(x + 5, y + 8, x + 7, y + 10, T_WHITE);   // check mark
+    g.drawLine(x + 7, y + 10, x + 11, y + 5, T_WHITE);
+  }
+}
+void icoWheel(Adafruit_GFX& g, int16_t x, int16_t y, uint16_t c) {
+  bool mono = (c == T_WHITE);
+  g.drawCircle(x + 8, y + 8, 7, mono ? T_WHITE : T_STEEL);
+  g.fillCircle(x + 8, y + 8, 2, mono ? T_WHITE : T_INK);
+}
+void icoGlobe(Adafruit_GFX& g, int16_t x, int16_t y, uint16_t c) {
+  bool mono = (c == T_WHITE);
+  uint16_t ring = mono ? T_WHITE : T_BLUE;
+  g.drawBitmap(x, y, ICO_RING, 16, 16, ring);
+  g.drawLine(x + 8, y + 2, x + 8, y + 13, ring);        // meridian
+  g.drawLine(x + 2, y + 8, x + 13, y + 8, ring);        // equator
+  if (!mono) {
+    g.fillCircle(x + 5, y + 6, 1, T_ACCENT);            // land
+    g.fillCircle(x + 10, y + 9, 1, T_ACCENT);
+    g.fillCircle(x + 9, y + 4, 1, T_ACCENT);
+  }
+}
+void uiIcon(Adafruit_GFX& g, uint8_t icon, int16_t x, int16_t y, uint16_t c, uint8_t pct) {
+  switch (icon) {
+    case 0:  icoTherm(g, x, y, c);  break;
+    case 1:  icoBatt(g, x, y, c, pct); break;
+    case 2:  icoBolt(g, x, y, c);   break;
+    case 3:  icoGauge(g, x, y, c);  break;
+    case 4:  icoDrop(g, x, y, c);   break;
+    case 5:  icoCan(g, x, y, c);    break;
+    case 6:  icoLink(g, x, y, c);   break;
+    case 7:  icoShield(g, x, y, c); break;
+    case 8:  icoWheel(g, x, y, c);  break;
+    default: icoGlobe(g, x, y, c);  break;
+  }
 }
 
-// ------------------------------------- PAGE 1 : ENGINE DEEP-DIVE / FUEL HEALTH
-void renderPage1(Adafruit_GFX& g) {
-  g.fillScreen(COLOR_BLACK);
-  uiTitle(g, "ENGINE", 1);
-  char buf[10];
-
-  uiLabel(g, 4, 24, "CALC LOAD");
-  snprintf(buf, sizeof(buf), "%u %%", telemetry.engine_load);
-  uiValue(g, 124, 24, buf, 2,
-          telemetry.engine_load > 80 ? COLOR_RED : (telemetry.engine_load >= 50 ? COLOR_YELLOW : COLOR_GREEN));
-  uiBar(g, 4, 44, 114, telemetry.engine_load / 100.0f, COLOR_CYAN);
-
-  uiLabel(g, 4, 58, "SYS VOLT");
-  snprintf(buf, sizeof(buf), "%.1f V", telemetry.battery_voltage);
-  uiValue(g, 124, 58, buf, 1, voltColorFor(telemetry.battery_voltage));
-  g.drawFastHLine(0, 70, 128, COLOR_DARK_GRAY);
-
-  uiLabel(g, 4, 74, "INTAKE AIR");
-  snprintf(buf, sizeof(buf), "%.1f C", telemetry.intake_air_temp);
-  uiValue(g, 124, 74, buf, 1, COLOR_WHITE);
-  g.drawFastHLine(0, 86, 128, COLOR_DARK_GRAY);
-
-  uiLabel(g, 4, 88, "FUEL TRIMS");
-  uiValue(g, 124, 88, "+-10%", 1, COLOR_GRAY);
-  uiLabel(g, 4, 100, "STFT");
-  uiSignedBar(g, 30, 98, 94, telemetry.stft, trimColorFor(telemetry.stft));
-  uiLabel(g, 4, 111, "LTFT");
-  uiSignedBar(g, 30, 109, 94, telemetry.ltft, trimColorFor(telemetry.ltft));
+// ==============================================================================================
+// PRIMITIVES
+// ==============================================================================================
+void uiLabel(Adafruit_GFX& g, const char* txt) {    // muted label ABOVE the number
+  g.setFont(&FreeSansBold9pt7b);
+  g.setTextSize(1);
+  g.setTextColor(T_MUTED);
+  g.setCursor(8, 33);
+  g.print(txt);
+}
+void uiHero(Adafruit_GFX& g, const char* value, uint16_t c) {  // big proportional digits
+  g.setFont(&FreeSansBold18pt7b);
+  g.setTextSize(1);
+  g.setTextColor(c);
+  g.setCursor(8, 64);
+  g.print(value);
+}
+void uiRule(Adafruit_GFX& g, int16_t y) { g.fillRect(8, y, 112, 1, T_LINE); }
+void uiBar(Adafruit_GFX& g, int16_t y, uint8_t pct, uint16_t c) {
+  g.fillRect(8, y, 112, 4, T_TRACK);
+  g.fillRect(8, y, (int16_t)((112L * pct) / 100), 4, c);
 }
 
-// ------------------------------------------- PAGE 2 : NODE STATUS / CONNECTIVITY
-void renderPage2(Adafruit_GFX& g) {
-  g.fillScreen(COLOR_BLACK);
-  uiTitle(g, "NODE", 2);
-  char buf[16];
+// struct UiRow is declared above, with the forward declarations
+void uiRowSet(UiRow& r, uint8_t id, const char* txt, uint16_t col) {
+  r.id  = id;
+  r.col = col;
+  strncpy(r.txt, txt, sizeof(r.txt) - 1);
+  r.txt[sizeof(r.txt) - 1] = 0;
+}
 
-#if DEVICE_BATT_MONITOR
-  uiLabel(g, 4, 26, "PACK");
-  uiBatteryIcon(g, 52, 24, device.device_pct / 100.0f, packColorFor(device.device_v));
-  snprintf(buf, sizeof(buf), "%u%%", device.device_pct);
-  uiValue(g, 124, 24, buf, 2, packColorFor(device.device_v));
-#endif
-  g.drawFastHLine(0, 46, 128, COLOR_DARK_GRAY);
-
-  uiLabel(g, 4, 52, "WIFI");
-  uiWifiIcon(g, 58, 50, (uint8_t)wifiBarsFor(WiFi.RSSI()));
-  snprintf(buf, sizeof(buf), "%d", WiFi.RSSI());
-  uiValue(g, 124, 52, buf, 1, COLOR_WHITE);
-  g.drawFastHLine(0, 68, 128, COLOR_DARK_GRAY);
-
-  uiLabel(g, 4, 72, "MQTT");
-  if (mqttConnected) {
-    uiValue(g, 124, 72, "ONLINE", 2, COLOR_GREEN);
-  } else if (!wifiConnected) {
-    uiValue(g, 124, 72, "NO WIFI", 2, COLOR_RED);
+void uiRowDraw(Adafruit_GFX& g, int16_t y, const UiRow& r, uint8_t pct) {
+  bool alert = (r.col == T_WARN || r.col == T_DANGER);
+  if (alert) {
+    g.fillRect(4, y - 2, 120, 17, r.col);                // SOLID alert band
+    uiIcon(g, r.id, 8, y - 1, T_WHITE, pct);             // white icon
+    g.setTextColor(T_WHITE);
   } else {
-    uiValue(g, 124, 72, "OFFLINE", 2, COLOR_RED);
+    uiIcon(g, r.id, 8, y - 1, r.col, pct);
+    g.setTextColor(r.col);
   }
-  g.drawFastHLine(0, 92, 128, COLOR_DARK_GRAY);
-
-  uiLabel(g, 4, 96, "CAN FEED");
-  uiValue(g, 124, 96, telemetry.using_sim_data ? "SIM" : "LIVE", 2,
-          telemetry.using_sim_data ? COLOR_YELLOW : COLOR_GREEN);
-
-  // footer strip: uptime + lifetime OBD dropout count
-  uint32_t up = millis() / 1000;
-  snprintf(buf, sizeof(buf), "UP %02lu:%02lu:%02lu",
-           (unsigned long)((up / 3600) % 100), (unsigned long)((up / 60) % 60), (unsigned long)(up % 60));
-  uiLabel(g, 4, 112, buf);
-  snprintf(buf, sizeof(buf), "D %u", device.disconnect_count);
-  uiValue(g, 124, 112, buf, 1, device.disconnect_count ? COLOR_RED : COLOR_GRAY);
+  g.setFont(&FreeSansBold9pt7b);
+  g.setTextSize(1);
+  g.setCursor(26, y + 13);
+  g.print(r.txt);
 }
 
-// ------------------------------------- PAGE 3 : NETWORK / DEMO ACCESS (direct connect)
-void renderPage3(Adafruit_GFX& g) {
-  g.fillScreen(COLOR_BLACK);
-  uiTitle(g, "NET", 3);
-  char buf[20];
+// ==============================================================================================
+// TOP BAND: solid fault banner when there is one, LEDs + page dashes when there isn't
+// ==============================================================================================
+void uiHead(Adafruit_GFX& g, uint8_t active) {
+  uint16_t fc;
+  const char* f = uiFault(&fc);
+  if (f) {
+    g.fillRect(0, 0, TFT_PANEL_W, 16, fc);              // SOLID fault band, white text
+    g.setFont(&FreeSansBold9pt7b);
+    g.setTextSize(1);
+    g.setTextColor(T_WHITE);
+    g.setCursor(6, 13);
+    g.print(f);
+    return;
+  }
+  g.fillCircle(33, 7, 3, (WiFi.status() == WL_CONNECTED) ? T_ACCENT : T_DANGER);  // WiFi LED
+  g.fillCircle(44, 7, 3, sevColorHex(telemetry.severity));            // severity LED
+  g.fillCircle(55, 7, 3, device.obd_detached ? T_DANGER : T_ACCENT);  // CAN LED
+  for (uint8_t i = 0; i < 5; i++) {
+    int16_t x = 66 + i * 8;
+    int16_t w = (i == active) ? 8 : 6;                   // active dash slightly wider
+    g.fillRect(x, 5, w, 4, i == active ? T_ACCENT : T_DOTOFF);
+  }
+  uiRule(g, 16);
+}
 
-  uiLabel(g, 4, 26, "IP ADDRESS");
-  snprintf(buf, sizeof(buf), "%s", WiFi.localIP().toString().c_str());
-  uiValue(g, 124, 26, buf, 1, COLOR_CYAN);
-  g.drawFastHLine(0, 40, 128, COLOR_DARK_GRAY);
+// ==============================================================================================
+// PAGES ??? 3 rows each (128x160 has no room for 5), same data as the mockup
+// ==============================================================================================
+void renderPage0(Adafruit_GFX& g) {          /* DRIVE */
+  char b[16];
+  UiRow rows[ROW_COUNT];
+  uiHead(g, 0);
+  uiLabel(g, "ENGINE RPM");
+  snprintf(b, sizeof(b), "%u", (unsigned)telemetry.rpm);
+  uiHero(g, b, rpmColorOf(telemetry.rpm));
+  uiBar(g, 69, (uint8_t)constrain((long)((long)telemetry.rpm * 100L / 6500L), 0L, 100L),
+        rpmColorOf(telemetry.rpm) == T_INK ? T_ACCENT : rpmColorOf(telemetry.rpm));
 
-  uiLabel(g, 4, 46, "LOCAL URL");
-  uiValue(g, 124, 46, "kolls-gw.local", 1, COLOR_CYAN);
-  g.drawFastHLine(0, 60, 128, COLOR_DARK_GRAY);
+  snprintf(b, sizeof(b), "LOAD %u%%", (unsigned)telemetry.engine_load);
+  uiRowSet(rows[0], 3, b, telemetry.engine_load > 80 ? T_DANGER : T_ACCENT);
+  snprintf(b, sizeof(b), "OIL %.0fC", telemetry.oil_temp);
+  uiRowSet(rows[1], 0, b, telemetry.oil_temp >= 110.0f ? T_DANGER : T_INK);
+  snprintf(b, sizeof(b), "%+.1f%%", telemetry.stft);
+  uiRowSet(rows[2], 4, b, trimColorOf(telemetry.stft));
+  for (uint8_t i = 0; i < ROW_COUNT; i++) uiRowDraw(g, ROW_Y0 + i * ROW_PITCH, rows[i], device.device_pct);
+}
 
-  uiLabel(g, 4, 66, "MQTT LINK");
-  uiValue(g, 124, 66, mqttConnected ? "ONLINE" : (wifiConnected ? "OFFLINE" : "NO WIFI"), 1,
-          mqttConnected ? COLOR_GREEN : COLOR_RED);
-  g.drawFastHLine(0, 80, 128, COLOR_DARK_GRAY);
+void renderPage1(Adafruit_GFX& g) {          /* THERMAL */
+  char b[16];
+  UiRow rows[ROW_COUNT];
+  uiHead(g, 1);
+  uiLabel(g, "COOLANT");
+  snprintf(b, sizeof(b), "%.1f", telemetry.coolant_temp);
+  uiHero(g, b, coolColorOf(telemetry.coolant_temp));
+  uiRule(g, 72);
 
-  uiLabel(g, 4, 86, "SIGNAL");
-  uiWifiIcon(g, 58, 84, (uint8_t)wifiBarsFor(WiFi.RSSI()));
-  snprintf(buf, sizeof(buf), "%d dB", WiFi.RSSI());
-  uiValue(g, 124, 86, buf, 1, COLOR_WHITE);
-  g.drawFastHLine(0, 100, 128, COLOR_DARK_GRAY);
+  snprintf(b, sizeof(b), "OIL %.0fC", telemetry.oil_temp);
+  uiRowSet(rows[0], 0, b, telemetry.oil_temp >= 110.0f ? T_DANGER : T_INK);
+  snprintf(b, sizeof(b), "IAT %.0fC", telemetry.intake_air_temp);
+  uiRowSet(rows[1], 0, b, T_INK);
+  snprintf(b, sizeof(b), "LOAD %u%%", (unsigned)telemetry.engine_load);
+  uiRowSet(rows[2], 3, b, telemetry.engine_load > 80 ? T_DANGER : T_ACCENT);
+  for (uint8_t i = 0; i < ROW_COUNT; i++) uiRowDraw(g, ROW_Y0 + i * ROW_PITCH, rows[i], device.device_pct);
+}
 
-  uint32_t up = millis() / 1000;
-  snprintf(buf, sizeof(buf), "UP %02lu:%02lu:%02lu",
-           (unsigned long)((up / 3600) % 100), (unsigned long)((up / 60) % 60), (unsigned long)(up % 60));
-  uiLabel(g, 4, 106, buf);
-  snprintf(buf, sizeof(buf), "D %u", device.disconnect_count);
-  uiValue(g, 124, 106, buf, 1, device.disconnect_count ? COLOR_RED : COLOR_GRAY);
-  uiLabel(g, 4, 116, "v2.2 DIRECT");
+void renderPage2(Adafruit_GFX& g) {          /* POWER */
+  char b[16];
+  UiRow rows[ROW_COUNT];
+  uiHead(g, 2);
+  uiLabel(g, "CAR VOLT");
+  snprintf(b, sizeof(b), "%.2f", telemetry.battery_voltage);
+  uiHero(g, b, voltColorOf(telemetry.battery_voltage));
+  uiRule(g, 72);
+
+  uint16_t pc;
+  if (device.connected) {
+    pc = device.device_pct < 20 ? T_DANGER : T_ACCENT;
+    snprintf(b, sizeof(b), "%u%%", (unsigned)device.device_pct);
+  } else {
+    pc = T_MUTED;
+    snprintf(b, sizeof(b), "--");
+  }
+  uiRowSet(rows[0], 1, b, pc);
+  if (device.connected) snprintf(b, sizeof(b), "%.2fV", device.device_v);
+  else                  snprintf(b, sizeof(b), "NO DIV");
+  uiRowSet(rows[1], 1, b, device.connected ? T_INK : T_MUTED);
+  snprintf(b, sizeof(b), "HLTH %u", (unsigned)telemetry.health_score);
+  uiRowSet(rows[2], 7, b, scoreColorOf(telemetry.health_score));
+  for (uint8_t i = 0; i < ROW_COUNT; i++) uiRowDraw(g, ROW_Y0 + i * ROW_PITCH, rows[i], device.device_pct);
+}
+
+void renderPage3(Adafruit_GFX& g) {          /* HEALTH */
+  char b[16];
+  UiRow rows[ROW_COUNT];
+  uiHead(g, 3);
+  uiLabel(g, "HEALTH");
+  snprintf(b, sizeof(b), "%u", (unsigned)telemetry.health_score);
+  uiHero(g, b, scoreColorOf(telemetry.health_score));
+  uiRule(g, 72);
+
+  uiRowSet(rows[0], 3, "ENG 95%",  T_ACCENT);
+  uiRowSet(rows[1], 0, "COOL 88%", T_WARN);
+  uiRowSet(rows[2], 2, "ELEC 97%", T_ACCENT);
+  for (uint8_t i = 0; i < ROW_COUNT; i++) uiRowDraw(g, ROW_Y0 + i * ROW_PITCH, rows[i], device.device_pct);
+}
+
+void renderPage4(Adafruit_GFX& g) {          /* LINK */
+  char b[16], bb[16];
+  UiRow rows[ROW_COUNT];
+  uiHead(g, 4);
+  uiLabel(g, "WIFI dBm");
+  int32_t rssi = WiFi.RSSI();
+  snprintf(b, sizeof(b), "%d", (int)rssi);
+  uiHero(g, b, rssi < -75 ? T_WARN : T_INK);
+  uiRule(g, 72);
+
+  uiRowSet(rows[0], 6, mqttConnected ? "MQTT OK" : "MQTT UP",
+           mqttConnected ? T_ACCENT : T_DANGER);
+  uiRowSet(rows[1], 5, device.obd_detached ? "CAN DET" : "CAN LIVE",
+           device.obd_detached ? T_DANGER : T_ACCENT);
+  IPAddress ip = WiFi.localIP();
+  snprintf(bb, sizeof(bb), "IP .%u", (unsigned)ip[3]);
+  uiRowSet(rows[2], 9, bb, T_MUTED);
+  for (uint8_t i = 0; i < ROW_COUNT; i++) uiRowDraw(g, ROW_Y0 + i * ROW_PITCH, rows[i], device.device_pct);
 }
 
 void renderPage(uint8_t page, Adafruit_GFX& g) {
-  switch (page % UI_PAGE_COUNT) {
+  g.fillScreen(T_BG);                 // canvas starts zeroed (black) ??? paint the light theme
+  switch (page % 5) {
     case 0:  renderPage0(g); break;
     case 1:  renderPage1(g); break;
     case 2:  renderPage2(g); break;
-    default: renderPage3(g); break;
+    case 3:  renderPage3(g); break;
+    default: renderPage4(g); break;
   }
 }
 
-// -------------------------------------------------- infinite-scroll mechanics
-/**
- * Pushes one frame of the scroll animation to the panel.
- * Viewport rows 0..119: top slice = outgoing page sliding up,
- * bottom slice = incoming page entering from below.
- */
-void uiBlit(int16_t off) {
-  tft.drawRGBBitmap(0, 0, pageCanvas->getBuffer() + off * 128, 128, 120 - off);
-  if (off > 0) {
-    tft.drawRGBBitmap(0, 120 - off, nextCanvas->getBuffer(), 128, off);
+// ==============================================================================================
+// CALM ALWAYS-ON FACE (car idle)
+// ==============================================================================================
+void renderCalmFace(Adafruit_GFX& g) {
+  char b[16];
+  UiRow rows[ROW_COUNT];
+  g.fillScreen(T_BG);                 // same reason as renderPage()
+  uiHead(g, 0);
+  uiLabel(g, "STATUS");
+
+  const char* st = telemetry.severity == 0 ? "OK" :
+                   telemetry.severity == 1 ? "WARN" : "CRIT";
+  uiHero(g, st, sevColorHex(telemetry.severity));
+  uiRule(g, 72);
+
+  snprintf(b, sizeof(b), "HLTH %u", (unsigned)telemetry.health_score);
+  uiRowSet(rows[0], 7, b, scoreColorOf(telemetry.health_score));
+  uint16_t pc;
+  if (device.connected) {
+    pc = device.device_pct < 20 ? T_DANGER : T_ACCENT;
+    snprintf(b, sizeof(b), "%u%%", (unsigned)device.device_pct);
+  } else {
+    pc = T_MUTED;
+    snprintf(b, sizeof(b), "--");
   }
+  uiRowSet(rows[1], 1, b, pc);
+  uint32_t up = millis() / 1000;
+  snprintf(b, sizeof(b), "IDLE %02lu:%02lu", (unsigned long)((up / 60) % 100), (unsigned long)(up % 60));
+  uiRowSet(rows[2], 8, b, T_MUTED);
+  for (uint8_t i = 0; i < ROW_COUNT; i++) uiRowDraw(g, ROW_Y0 + i * ROW_PITCH, rows[i], device.device_pct);
+}
+
+// ==============================================================================================
+// PINNED COMPLICATION STRIP (y 134..160) ??? floods red on any DANGER fault
+// ==============================================================================================
+void drawStrip() {
+  const int16_t Y = TFT_VIEW_H;
+  uint16_t fc;
+  const char* f = uiFault(&fc);
+  bool crit = (f != NULL && fc == T_DANGER);
+
+  // strip background first ...
+  tft.fillRect(0, Y, TFT_PANEL_W, TFT_PANEL_H - Y, crit ? T_DANGER : T_SURF);
+  tft.fillRect(8, Y, 112, 1, crit ? T_WHITE : T_LINE);
+
+  // ... then the severity bar along the left edge, full height (must be last so
+  // the strip background cannot paint over its bottom 26 px)
+  tft.fillRect(0, 0, 3, TFT_PANEL_H, crit ? T_DANGER : sevColorHex(telemetry.severity));
+
+  uint16_t canC = crit ? T_WHITE : (device.obd_detached ? T_DANGER : T_ACCENT);
+  icoCan(tft, 6, Y + 6, canC);
+  tft.setFont(&FreeSansBold9pt7b);
+  tft.setTextSize(1);
+  tft.setTextColor(canC);
+  tft.setCursor(22, Y + 18);
+  tft.print(device.obd_detached ? "DET" : (telemetry.using_sim_data && !device.everSawOBD ? "SIM" : "CAN"));
+
+  tft.fillRect(58, Y + 5, 1, 16, crit ? T_WHITE : T_LINE);
+
+  if (device.connected) {
+    icoBatt(tft, 62, Y + 6, crit ? T_WHITE : (device.device_pct < 20 ? T_DANGER : T_ACCENT),
+            device.device_pct);
+    tft.setFont(&FreeSansBold9pt7b);
+    tft.setTextSize(1);
+    tft.setTextColor(crit ? T_WHITE : (device.device_pct < 20 ? T_DANGER : T_INK));
+    tft.setCursor(80, Y + 18);
+    char b[8];
+    snprintf(b, sizeof(b), "%u%%", (unsigned)device.device_pct);
+    tft.print(b);
+  } else {
+    icoBatt(tft, 62, Y + 6, crit ? T_WHITE : T_MUTED, 0);
+    tft.setFont(&FreeSansBold9pt7b);
+    tft.setTextSize(1);
+    tft.setTextColor(crit ? T_WHITE : T_MUTED);
+    tft.setCursor(80, Y + 18);
+    tft.print("--");
+  }
+}
+
+// ==============================================================================================
+// CAROUSEL ??? hold 4.2 s, glide 1.6 s, content rises from the bottom
+// ==============================================================================================
+void uiBlitAnimate(int16_t off) {
+  if (off <= 0) return;
+  int16_t top = TFT_VIEW_H - off;
+  if (top > 0) {
+    tft.drawRGBBitmap(0, 0, pageCanvas->getBuffer() + off * TFT_PANEL_W,
+                      TFT_PANEL_W, top);                       // tail of the current page
+  }
+  tft.drawRGBBitmap(0, top, nextCanvas->getBuffer(),
+                    TFT_PANEL_W, off);                         // head of the next page
 }
 
 void uiInit() {
-  pageCanvas = new GFXcanvas16(128, 120);
-  nextCanvas = new GFXcanvas16(128, 120);
-  canvasOk = (pageCanvas != NULL) && (nextCanvas != NULL) &&
-             (pageCanvas->getBuffer() != NULL) && (nextCanvas->getBuffer() != NULL);
+  pageCanvas = new GFXcanvas16(TFT_PANEL_W, TFT_VIEW_H);
+  nextCanvas = new GFXcanvas16(TFT_PANEL_W, TFT_VIEW_H);
+  canvasOk   = (pageCanvas != NULL) && (nextCanvas != NULL) &&
+               (pageCanvas->getBuffer() != NULL) && (nextCanvas->getBuffer() != NULL);
   if (!canvasOk) {
-    delete pageCanvas;
-    pageCanvas = NULL;
-    delete nextCanvas;
-    nextCanvas = NULL;
-    Serial.println(F("[TFT] Not enough heap for carousel buffers -> static fallback"));
-    return;
+    delete pageCanvas; pageCanvas = NULL;
+    delete nextCanvas; nextCanvas = NULL;
+    Serial.println(F("[TFT] Not enough heap for page buffers -> static page fallback"));
+  } else {
+    Serial.printf("[TFT] Carousel live: %dx%d portrait (ST7735S), 5 pages, 2x%u-byte buffers\n",
+                  TFT_PANEL_W, TFT_PANEL_H, (unsigned)(TFT_PANEL_W * TFT_VIEW_H * 2));
   }
-  Serial.printf("[TFT] Carousel ready: %u-page infinite scroll (2x %u-byte buffers)\n",
-                UI_PAGE_COUNT, (unsigned)(128u * 120u * 2u));
-  renderPage(0, *pageCanvas);
-  tft.drawRGBBitmap(0, 0, pageCanvas->getBuffer(), 128, 120);
-  drawFooter(true);
+  tft.fillScreen(T_BG);
+  if (canvasOk) {
+    renderPage(0, *pageCanvas);
+    tft.drawRGBBitmap(0, 0, pageCanvas->getBuffer(), TFT_PANEL_W, TFT_VIEW_H);
+  } else {
+    renderPage(0, tft);
+  }
+  drawStrip();
   pageHoldStart = millis();
+  calmLastDraw  = millis();
+  lastLiveDraw  = millis();
 }
 
 void uiTick(unsigned long now) {
-  drawFooter(false);   // cheap (cache-guarded); re-renders on status change
+  bool wantCalm = device.everSawOBD ? (now - lastOBDDataTime > 10000) : false;
+  if (wantCalm != uiCalm) {
+    uiCalm = wantCalm;
+    if (uiCalm) {
+      if (canvasOk) { renderCalmFace(*pageCanvas);
+                      tft.drawRGBBitmap(0, 0, pageCanvas->getBuffer(), TFT_PANEL_W, TFT_VIEW_H); }
+      else          { renderCalmFace(tft); }
+      calmLastDraw = now;
+      drawStrip();
+      return;
+    }
+    pageHoldStart = now;
+  }
 
-  // Degraded mode (heap too tight for buffers): keep the hero page static
-  if (!canvasOk) {
-    static unsigned long lastFallbackDraw = 0;
-    if (now - lastFallbackDraw >= UI_HOLD_MS) {
-      lastFallbackDraw = now;
-      renderPage(0, tft);
-      drawFooter(true);
+  if (uiCalm) {
+    if (now - calmLastDraw > 30000) {             // gentle 30 s refresh
+      calmLastDraw = now;
+      if (canvasOk) { renderCalmFace(*pageCanvas);
+                      tft.drawRGBBitmap(0, 0, pageCanvas->getBuffer(), TFT_PANEL_W, TFT_VIEW_H); }
+      else          { renderCalmFace(tft); }
+      drawStrip();
     }
     return;
   }
 
-  // CRITICAL: freeze the carousel so the strobing pinned footer can't be missed
-  if (telemetry.severity == 2) {
-    pageHoldStart = now;
+  if (!canvasOk) {                                 // heap fallback: plain static pages
+    static unsigned long lastFallback = 0;
+    if (now - lastFallback >= 4200) {
+      lastFallback = now;
+      currPage = (currPage + 1) % 5;
+      renderPage(currPage, tft);
+      drawStrip();
+    }
     return;
   }
 
   if (uiAnimating) {
-    int16_t off = (int16_t)(((float)(now - uiAnimStart) * 120.0f) / (float)UI_GLIDE_MS);
-    if (off > 120) off = 120;
-    if (off != lastAnimOff) {
-      uiBlit(off);
-      lastAnimOff = off;
-      if (off >= 120) {
-        GFXcanvas16* tmp = pageCanvas;
-        pageCanvas = nextCanvas;
-        nextCanvas = tmp;
-        currPage = (currPage + 1) % UI_PAGE_COUNT;
-        pageHoldStart = now;
-        uiAnimating = false;
-      }
+    int16_t off = (int16_t)(((float)(now - uiAnimStart) * (float)TFT_VIEW_H) / 1600.0f);
+    if (off > TFT_VIEW_H) off = TFT_VIEW_H;
+    if (off > 0) uiBlitAnimate(off);
+    if (off >= TFT_VIEW_H) {
+      GFXcanvas16* tmp = pageCanvas;
+      pageCanvas = nextCanvas;
+      nextCanvas = tmp;
+      currPage   = (currPage + 1) % 5;
+      pageHoldStart = now;
+      uiAnimating   = false;
     }
-  } else if (now - pageHoldStart >= UI_HOLD_MS) {
-    renderPage((currPage + 1) % UI_PAGE_COUNT, *nextCanvas);
-    uiAnimStart = now;
-    uiAnimating = true;
-    lastAnimOff = -1;
-  }
-}
-
-// --------------------------------------------------- PINNED STATUS FOOTER (y:120-159)
-void drawFooter(bool force) {
-  bool changed = (lastFooterSev != telemetry.severity) ||
-                 (lastFooterStatus != telemetry.status) ||
-                 (lastFooterFlash != flashState);
-  if (!force && !changed) return;
-
-  lastFooterSev    = telemetry.severity;
-  lastFooterStatus = telemetry.status;
-  lastFooterFlash  = flashState;
-
-  const int16_t Y = 120, H = 40;
-
-  if (telemetry.severity == 0) {
-    tft.fillRect(0, Y, 128, H, COLOR_GREEN);
-    uiCentered(tft, Y + 5, "NOMINAL", 2, COLOR_BLACK);
-    uiCentered(tft, Y + 24, telemetry.using_sim_data ? "BENCH DEMO MODE" : "ALL SYSTEMS OK", 1, COLOR_BLACK);
-  } else if (telemetry.severity == 1) {
-    tft.fillRect(0, Y, 128, H, COLOR_YELLOW);
-    uiCentered(tft, Y + 5, "WARNING", 2, COLOR_BLACK);
-    uiCentered(tft, Y + 24, telemetry.status.c_str(), 1, COLOR_BLACK);
   } else {
-    uint16_t bg = flashState ? COLOR_RED : COLOR_BLACK;
-    uint16_t fg = flashState ? COLOR_WHITE : COLOR_RED;
-    tft.fillRect(0, Y, 128, H, bg);
-    tft.drawRect(0, Y, 127, H - 1, COLOR_RED);
-
-    if (device.obd_detached) {
-      uiCentered(tft, Y + 5, "DETACHED", 2, fg);
-      uiCentered(tft, Y + 24, "OBD UNPLUGGED", 1, fg);
-    } else {
-      const char* s = telemetry.status.c_str();
-      uint8_t size = (strlen(s) <= 10) ? 2 : 1;
-      uiCentered(tft, Y + (size == 2 ? 5 : 10), s, size, fg);
-      uiCentered(tft, Y + 24, device.device_critical ? "CHARGE DEVICE NOW" : "CHECK VEHICLE", 1, fg);
+    if (now - lastLiveDraw >= 500) {               // live refresh (values + fault band)
+      lastLiveDraw = now;
+      renderPage(currPage, *pageCanvas);
+      tft.drawRGBBitmap(0, 0, pageCanvas->getBuffer(), TFT_PANEL_W, TFT_VIEW_H);
+    }
+    if (now - pageHoldStart >= 4200) {             // start the glide to the next page
+      renderPage((currPage + 1) % 5, *nextCanvas);
+      uiAnimStart = now;
+      uiAnimating = true;
     }
   }
+  drawStrip();
 }
 
 #endif // USE_TFT
-

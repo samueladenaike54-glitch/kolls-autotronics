@@ -1192,7 +1192,7 @@ function renderVehicleDrawer(vehicle) {
 
     <section class="fleet-drawer-section">
       <div class="fleet-drawer-section-head">
-        <h3>Live telemetry</h3>
+        <h3>Live data</h3>
         <span>${vehicle.status === 'active' ? 'Streaming' : 'Last sample'}</span>
       </div>
       <div class="fleet-drawer-telemetry">
@@ -1694,11 +1694,11 @@ function renderAll() {
 function fleetLocationLabel(location) {
   if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lon)) return '';
   const source = location.source === 'app'
-    ? 'Phone GPS'
+    ? 'Live location'
     : location.source === 'gps'
-      ? 'GPS'
+      ? 'Live location'
       : location.source === 'ip'
-        ? 'IP estimate'
+        ? 'Approximate area'
         : '';
   if (!source) return '';
   const expired = (location.source === 'app' || location.source === 'gps') && location.fix > 0 && location.ageS > 120;
@@ -1739,14 +1739,14 @@ function updateLiveMapPin(location) {
       return;
     }
 
-    const sourceLabel = location.source === 'ip' ? 'IP EST.' : 'GPS';
+    const sourceLabel = location.source === 'ip' ? 'APPROX.' : 'LIVE';
     const place = location.city || `${location.lat.toFixed(3)}, ${location.lon.toFixed(3)}`;
     const active = location.fix > 0 ? ' map-pin--active' : '';
     const html = `
       <span class="map-pin map-pin--live${active}" data-source="${escapeHtml(location.source || 'none')}" style="--x:${position.x.toFixed(1)}%;--y:${position.y.toFixed(1)}%" role="img"
-        aria-label="Live ESP32 location, ${escapeHtml(place)}, ${sourceLabel === 'GPS' ? 'GPS fix' : 'city-level IP estimate'}">
+        aria-label="Live Orion X location, ${escapeHtml(place)}, ${sourceLabel === 'LIVE' ? 'live location' : 'approximate city location'}">
         <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>
-        <span class="map-pin-label">LIVE · ${sourceLabel}</span>
+        <span class="map-pin-label">${sourceLabel === 'LIVE' ? 'ORION X · LIVE' : 'ORION X · APPROX.'}</span>
       </span>
     `;
 
@@ -1757,6 +1757,53 @@ function updateLiveMapPin(location) {
       if (pins) pins.insertAdjacentHTML('beforeend', html);
     }
   });
+}
+
+function friendlyLiveMode(data) {
+  const text = String(data && data.statusText ? data.statusText : '').trim();
+  if (/BENCH|SIM/i.test(text)) return 'Demo mode';
+  if (data && data.obdDetached) return 'Check vehicle';
+  if (data && data.severity >= 2) return 'Alert';
+  if (data && data.severity === 1) return 'Warning';
+  if (/NOMINAL|OK|ONLINE|CONNECTED/i.test(text)) return 'Connected';
+  return text || 'Connected';
+}
+
+function triggerOrionXBuzzer() {
+  const status = window.OrionLive ? window.OrionLive.status() : null;
+  const button = document.getElementById('fleet-buzzer-btn');
+  if (!status || !status.connected) {
+    showToast('Orion X is not connected yet.', 'warn');
+    return;
+  }
+
+  const pulse = () => {
+    if (!button) return;
+    button.classList.add('is-sounding');
+    window.setTimeout(() => button.classList.remove('is-sounding'), 1100);
+  };
+
+  if (status.mode === 'gateway') {
+    fetch(status.gatewayUrl + '/buzzer', { method: 'POST', cache: 'no-store' })
+      .then((response) => {
+        if (!response.ok) throw new Error('No reply');
+        pulse();
+        showToast('Orion X is sounding.', 'good');
+      })
+      .catch(() => showToast('Could not reach Orion X. Try again.', 'warn'));
+    return;
+  }
+
+  const sent = window.OrionLive.sendBuzzer
+    ? window.OrionLive.sendBuzzer(900)
+    : window.OrionLive.sendCommand('BUZZER');
+  if (!sent) {
+    showToast('Could not reach Orion X. Try again.', 'warn');
+    return;
+  }
+
+  pulse();
+  showToast('Orion X is sounding.', 'good');
 }
 
 function updateFleetLive() {
@@ -1770,10 +1817,13 @@ function updateFleetLive() {
   const chip = document.getElementById('fleet-device-chip');
   const title = document.getElementById('fleet-device-title');
   const sub = document.getElementById('fleet-device-sub');
+  const button = document.getElementById('fleet-buzzer-btn');
+
+  if (button) button.disabled = !(status && status.connected);
 
   const setChip = (tone, text) => {
     if (chip) {
-      chip.className = `chip chip--${tone}`;
+      chip.className = 'chip chip--' + tone;
       chip.textContent = text;
     }
   };
@@ -1781,28 +1831,29 @@ function updateFleetLive() {
   if (data) {
     const tone = data.tone || (data.severity === 2 ? 'danger' : data.severity === 1 ? 'warn' : 'good');
     const locationText = fleetLocationLabel(data.location);
+    const mode = friendlyLiveMode(data);
     card.dataset.state = tone;
-    if (title) title.textContent = fresh ? `${data.vehicleId} · live gateway` : `${data.vehicleId} · last seen`;
+    if (title) title.textContent = fresh ? `${data.vehicleId} · Orion X connected` : `${data.vehicleId} · last seen`;
     if (sub) {
       sub.textContent = fresh
-        ? `${data.statusText} · ${data.canFeed}${locationText ? ` · ${locationText}` : ''} · updated ${age}s ago`
-        : `Last packet ${age}s ago${locationText ? ` · last location: ${locationText}` : ''}. The fleet sample records remain editable while the gateway reconnects.`;
+        ? `${mode}${locationText ? ` · ${locationText}` : ''} · updated ${age}s ago`
+        : `Last reading ${age}s ago${locationText ? ` · last location: ${locationText}` : ''}. Sample fleet records remain editable while Orion X reconnects.`;
     }
-    document.getElementById('fleet-device-rpm').textContent = data.rpm > 0 ? `${Math.round(data.rpm).toLocaleString('en-US')}` : '--';
+    document.getElementById('fleet-device-rpm').textContent = data.rpm > 0 ? Math.round(data.rpm).toLocaleString('en-US') : '--';
     document.getElementById('fleet-device-coolant').textContent = data.coolant > 0 ? `${data.coolant.toFixed(1)}°C` : '--';
-    document.getElementById('fleet-device-battery').textContent = data.battery > 0 ? `${data.battery.toFixed(2)} V` : '--';
-    document.getElementById('fleet-device-status').textContent = data.statusText;
-    setChip(fresh ? tone : 'warn', fresh ? (tone === 'danger' ? 'Alert' : tone === 'warn' ? 'Warning' : 'Live') : 'Stale');
+    document.getElementById('fleet-device-battery').textContent = data.battery > 0 ? data.battery.toFixed(2) + ' V' : '--';
+    document.getElementById('fleet-device-status').textContent = mode;
+    setChip(fresh ? tone : 'warn', fresh ? (tone === 'danger' ? 'Alert' : tone === 'warn' ? 'Warning' : 'Live') : 'Offline');
 
     const label = document.getElementById('fleet-sample-label');
     if (label) {
-      label.innerHTML = `<span class="status-dot" aria-hidden="true"></span> ${fresh ? 'ESP32 live' : 'Sample telemetry'}`;
+      label.innerHTML = '<span class="status-dot" aria-hidden="true"></span> ' + (fresh ? 'Orion X connected' : 'Sample data');
     }
     const note = document.getElementById('fleet-data-note');
     if (note) {
       note.innerHTML = fresh
-        ? '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Live telemetry is coming from the ESP32 gateway. Sample fleet records remain editable below.'
-        : '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Showing the last ESP32 packet plus the editable sample fleet records.';
+        ? '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Live data is coming from Orion X. Sample fleet records remain editable below.'
+        : '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Showing the last Orion X reading plus the editable sample fleet records.';
     }
     updateLiveMapPin(data.location);
     return;
@@ -1817,20 +1868,20 @@ function updateFleetLive() {
 
   const sampleLabel = document.getElementById('fleet-sample-label');
   if (sampleLabel) {
-    sampleLabel.innerHTML = '<span class="status-dot" aria-hidden="true"></span> Sample telemetry';
+    sampleLabel.innerHTML = '<span class="status-dot" aria-hidden="true"></span> Sample data';
   }
   const sampleNote = document.getElementById('fleet-data-note');
   if (sampleNote) {
-    sampleNote.innerHTML = '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Sample telemetry for demonstration. The live ESP32 gateway updates this portal when it connects.';
+    sampleNote.innerHTML = '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Sample data for demonstration. Orion X updates this portal when it connects.';
   }
 
   if (status && status.connected) {
-    if (title) title.textContent = 'Waiting for KA-TRUCK-001';
-    if (sub) sub.textContent = 'Connected to EMQX. The live gateway will update this banner when its next packet arrives.';
+    if (title) title.textContent = 'Waiting for Orion X';
+    if (sub) sub.textContent = 'Orion X is connected. Waiting for live vehicle data…';
     setChip('quiet', 'Waiting');
   } else {
-    if (title) title.textContent = 'Waiting for KA-TRUCK-001';
-    if (sub) sub.textContent = 'The fleet sample records are shown below. They will update automatically when the ESP32 gateway connects.';
+    if (title) title.textContent = 'Waiting for Orion X';
+    if (sub) sub.textContent = 'The fleet sample records are shown below. They will update automatically when Orion X connects.';
     setChip('quiet', 'Offline');
   }
 }
@@ -1954,6 +2005,8 @@ function init() {
 
   showPage(STATE.page);
 }
+
+window.triggerOrionXBuzzer = triggerOrionXBuzzer;
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);

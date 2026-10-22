@@ -21,3 +21,5 @@ secrets.h
 
 # User document (do not commit)
 j.pdf
+
+.opencode/

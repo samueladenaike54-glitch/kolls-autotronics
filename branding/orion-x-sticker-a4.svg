@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="210mm" height="297mm" viewBox="0 0 2100 2970" role="img" aria-labelledby="sheetTitle sheetDesc">
+  <title id="sheetTitle">Orion X sticker sheet</title>
+  <desc id="sheetDesc">Twelve square 60 millimetre Orion X stickers on an A4 sheet, with cut guides.</desc>
+
+  <defs>
+    <g id="stickerSheetItem">
+      <rect width="600" height="600" fill="#151614"/>
+      <circle cx="300" cy="178" r="176" fill="#3ddb9a" opacity="0.055"/>
+      <rect x="20" y="20" width="560" height="560" rx="58" fill="none" stroke="#3ddb9a" stroke-opacity="0.58" stroke-width="3"/>
+      <g transform="translate(300 178) scale(3.8) translate(-32 -32)">
+        <g fill="none" stroke="#f7f7f2" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 48 27 36 36 29 43 21"/>
+        </g>
+        <g fill="#f7f7f2">
+          <circle cx="16" cy="48" r="3.5"/>
+          <circle cx="27" cy="36" r="3.5"/>
+          <circle cx="36" cy="29" r="3.5"/>
+        </g>
+        <path d="M47 10 48.8 14.2 53 16 48.8 17.8 47 22 45.2 17.8 41 16 45.2 14.2Z" fill="#3ddb9a"/>
+        <circle cx="18" cy="18" r="1.8" fill="#f7f7f2" opacity="0.5"/>
+        <circle cx="51" cy="47" r="1.8" fill="#f7f7f2" opacity="0.5"/>
+      </g>
+      <text x="300" y="397" text-anchor="middle"
+        font-family="'Arial Black', 'Segoe UI Black', Arial, sans-serif"
+        font-size="96" font-weight="900" letter-spacing="2" fill="#f7f7f2">ORION <tspan fill="#3ddb9a">X</tspan></text>
+      <text x="300" y="470" text-anchor="middle"
+        font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif"
+        font-size="22" font-weight="700" letter-spacing="8" fill="#f7f7f2" fill-opacity="0.72">KOLLS AUTOTRONICS</text>
+    </g>
+
+    <g id="cutGuide">
+      <rect width="600" height="600" fill="none" stroke="#b9b9b0" stroke-width="1.5" stroke-dasharray="10 8"/>
+    </g>
+  </defs>
+
+  <rect width="2100" height="2970" fill="#ffffff"/>
+
+  <text x="1050" y="58" text-anchor="middle" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif"
+    font-size="26" font-weight="700" letter-spacing="1" fill="#151614">ORION X — 60 mm sticker sheet</text>
+  <text x="1050" y="88" text-anchor="middle" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif"
+    font-size="16" font-weight="600" letter-spacing="2.5" fill="#77786f">PRINT AT 100% · CUT ALONG THE DASHED GUIDES</text>
+
+  <!-- 3 columns × 4 rows, 60 mm each -->
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(70 150)"/>
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(750 150)"/>
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(1430 150)"/>
+
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(70 830)"/>
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(750 830)"/>
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(1430 830)"/>
+
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(70 1510)"/>
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(750 1510)"/>
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(1430 1510)"/>
+
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(70 2190)"/>
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(750 2190)"/>
+  <use href="#stickerSheetItem" xlink:href="#stickerSheetItem" transform="translate(1430 2190)"/>
+
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(70 150)"/>
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(750 150)"/>
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(1430 150)"/>
+
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(70 830)"/>
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(750 830)"/>
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(1430 830)"/>
+
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(70 1510)"/>
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(750 1510)"/>
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(1430 1510)"/>
+
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(70 2190)"/>
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(750 2190)"/>
+  <use href="#cutGuide" xlink:href="#cutGuide" transform="translate(1430 2190)"/>
+
+  <text x="1050" y="2900" text-anchor="middle" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif"
+    font-size="16" font-weight="600" letter-spacing="2.5" fill="#77786f">12 STICKERS · 60 × 60 MM · KOLLS AUTOTRONICS</text>
+</svg>
