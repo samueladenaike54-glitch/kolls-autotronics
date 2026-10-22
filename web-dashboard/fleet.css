@@ -3341,3 +3341,8 @@
     display: none;
   }
 }
+
+/* Leaflet map styles */
+.leaflet-container { font-family: inherit; background: #19201d; z-index: 1; }
+.leaflet-fleet-icon, .leaflet-orion-live-icon { background: transparent !important; border: none !important; }
+.leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); }

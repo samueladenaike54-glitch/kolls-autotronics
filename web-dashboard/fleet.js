@@ -643,74 +643,97 @@ function getVisibleVehicles() {
    Rendering — shared pieces
    -------------------------------------------------------------------------- */
 
+const leafletMaps = {};
+const leafletMarkers = {};
+const orionLiveMarkers = {};
+
+function getVehicleLatLng(vehicle) {
+  if (vehicle.lat && vehicle.lng) return [vehicle.lat, vehicle.lng];
+  const defaults = {
+    'v-rav4': [6.4474, 3.4705],
+    'v-civic': [6.5165, 3.3765],
+    'v-f150': [6.4485, 3.3642],
+    'v-sprinter': [6.6018, 3.3515],
+    'v-ioniq': [6.4215, 3.4110],
+    'v-npr': [6.4420, 3.3600],
+    'v-3008': [6.5562, 3.3885],
+    'v-model3': [6.4523, 3.4354],
+    'v-hiace': [6.5541, 3.3520],
+    'v-sorento': [6.4975, 3.3585]
+  };
+  return defaults[vehicle.id] || [6.5244, 3.3792];
+}
+
 function renderMap(containerId, vehicles, variant) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  const pins = vehicles.map((vehicle) => {
+  if (typeof L === 'undefined') {
+    container.innerHTML = '<div style="display:grid;place-items:center;height:100%;color:var(--muted);font-size:12px;">Connecting to map network...</div>';
+    return;
+  }
+
+  let map = leafletMaps[containerId];
+  if (!map) {
+    container.innerHTML = '';
+    map = L.map(containerId, {
+      zoomControl: true,
+      attributionControl: false,
+      scrollWheelZoom: variant === 'tracking'
+    }).setView([6.50, 3.39], variant === 'overview' ? 11 : 12);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd'
+    }).addTo(map);
+
+    leafletMaps[containerId] = map;
+    leafletMarkers[containerId] = [];
+
+    setTimeout(() => map.invalidateSize(), 300);
+  }
+
+  // Clear existing markers
+  if (leafletMarkers[containerId]) {
+    leafletMarkers[containerId].forEach(m => m.remove());
+    leafletMarkers[containerId] = [];
+  }
+
+  // Add vehicle markers with real coordinates
+  vehicles.forEach((vehicle) => {
+    const latlng = getVehicleLatLng(vehicle);
     const meta = STATUS_META[vehicle.status] || STATUS_META.idle;
-    const selected = vehicle.id === STATE.selectedVehicleId ? ' is-selected' : '';
-    return `
-      <button class="map-pin map-pin--${meta.className}${selected}" style="--x:${vehicle.x}%;--y:${vehicle.y}%" type="button"
-        onclick="openVehicle('${escapeHtml(vehicle.id)}')"
-        aria-label="${escapeHtml(vehicleName(vehicle))}, ${meta.label}, ${escapeHtml(vehicle.location)}">
+    const isSelected = vehicle.id === STATE.selectedVehicleId;
+
+    const iconHtml = `
+      <div class="map-pin map-pin--${meta.className}${isSelected ? ' is-selected' : ''}" style="position:relative;left:0;top:0;transform:none;" role="button">
         <i class="fa-solid fa-car-side" aria-hidden="true"></i>
-        <span class="map-pin-label">${escapeHtml(shortModel(vehicle.model))}</span>
-      </button>
+        <span class="map-pin-label" style="opacity:1;">${escapeHtml(shortModel(vehicle.model))}</span>
+      </div>
     `;
-  }).join('');
 
-  const places = MAP_PLACES.map((place) => (
-    `<span class="map-place" style="left:${place.x}%;top:${place.y}%">${escapeHtml(place.name)}</span>`
-  )).join('');
+    const customIcon = L.divIcon({
+      html: iconHtml,
+      className: 'leaflet-fleet-icon',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
+    });
 
-  const legend = `
-    <div class="map-legend" aria-hidden="true">
-      <span><i class="map-legend-dot"></i>Moving</span>
-      <span><i class="map-legend-dot map-legend-dot--idle"></i>Idle</span>
-      <span><i class="map-legend-dot map-legend-dot--service"></i>Service</span>
-      <span><i class="map-legend-dot map-legend-dot--alert"></i>Alert</span>
-    </div>
-  `;
+    const marker = L.marker(latlng, { icon: customIcon }).addTo(map);
 
-  container.innerHTML = `
-    <svg class="fleet-map-art" viewBox="0 0 800 480" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-      <path class="map-water" d="M530 480 C553 419 575 365 633 334 C694 301 753 290 820 252 L820 480 Z"></path>
-      <path class="map-park" d="M454 0 L594 0 L602 54 C566 76 526 67 492 50 Z"></path>
-      <path class="map-park" d="M0 302 C48 285 97 292 126 323 C110 354 74 368 29 354 L0 346 Z"></path>
-
-      <g>
-        <path class="map-road map-road--major" d="M-20 138 C128 102 253 151 388 116 S638 72 820 124"></path>
-        <path class="map-road map-road--major" d="M257 -20 C278 105 243 192 302 298 S338 410 294 500"></path>
-        <path class="map-road map-road--major" d="M82 -20 C140 108 131 231 92 353 C66 432 72 472 104 500"></path>
-        <path class="map-road map-road--highlight" d="M69 443 C218 362 380 310 544 333 S727 389 830 337"></path>
-        <path class="map-road map-road--major" d="M422 -20 C451 96 500 172 566 235 S701 323 834 330"></path>
-
-        <path class="map-road" d="M-20 218 C110 193 223 223 337 198 S557 141 820 196"></path>
-        <path class="map-road" d="M-20 302 C164 267 275 300 404 271 S650 225 820 280"></path>
-        <path class="map-road" d="M-20 390 C152 331 295 370 442 354 S643 313 820 386"></path>
-        <path class="map-road" d="M168 -20 C183 113 173 246 202 374 S204 445 191 500"></path>
-        <path class="map-road" d="M354 -20 C372 95 358 210 390 310 S413 431 386 500"></path>
-        <path class="map-road" d="M512 -20 C497 105 530 194 512 297 S528 418 565 500"></path>
-        <path class="map-road" d="M662 -20 C642 112 681 213 654 324 S673 441 711 500"></path>
-
-        <path class="map-road" d="M46 78 C132 164 156 247 122 342"></path>
-        <path class="map-road" d="M231 60 C320 132 356 217 336 330"></path>
-        <path class="map-road" d="M438 79 C490 159 492 243 454 333"></path>
-        <path class="map-road" d="M612 62 C581 151 603 237 645 318"></path>
-        <path class="map-road" d="M706 106 C748 183 748 259 719 331"></path>
-
-        <circle cx="302" cy="298" r="5" fill="rgba(255,255,255,0.16)"></circle>
-        <circle cx="512" cy="349" r="5" fill="rgba(255,255,255,0.16)"></circle>
-        <circle cx="202" cy="374" r="4" fill="rgba(255,255,255,0.13)"></circle>
-        <circle cx="654" cy="324" r="4" fill="rgba(255,255,255,0.13)"></circle>
-      </g>
-    </svg>
-    ${places}
-    <div class="map-pins">${pins}</div>
-    ${legend}
-    <span class="map-sample-badge">${variant === 'overview' ? 'Sample map' : 'Illustrative map'}</span>
-  `;
+    const popupContent = `
+      <div style="font-family:inherit;font-size:12px;line-height:1.45;color:#111;">
+        <strong style="font-size:13px;display:block;margin-bottom:2px;">${escapeHtml(vehicleName(vehicle))}</strong>
+        <span style="color:#555;">${escapeHtml(vehicle.plate)} · ${escapeHtml(vehicle.branch)}</span><br>
+        <span>Status: <strong style="text-transform:capitalize;">${meta.label}</strong></span><br>
+        <span>Health score: <strong>${vehicle.health}/100</strong></span><br>
+        <span>Speed: <strong>${vehicle.speed} km/h</strong></span><br>
+        <button style="margin-top:6px;padding:4px 10px;background:#0d6efd;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;font-size:11px;" onclick="openVehicle('${escapeHtml(vehicle.id)}')">View details</button>
+      </div>
+    `;
+    marker.bindPopup(popupContent);
+    leafletMarkers[containerId].push(marker);
+  });
 
   const live = window.OrionLive ? window.OrionLive.status() : null;
   if (live && live.data) updateLiveMapPin(live.data.location);
@@ -1727,34 +1750,37 @@ function liveMapPosition(location) {
 }
 
 function updateLiveMapPin(location) {
-  const position = liveMapPosition(location);
+  if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lon)) return;
+  const latlng = [location.lat, location.lon];
 
   ['overview-map', 'tracking-map'].forEach((containerId) => {
-    const container = document.getElementById(containerId);
-    if (!container) return;
+    const map = leafletMaps[containerId];
+    if (!map) return;
 
-    const existing = container.querySelector('.map-pin--live');
-    if (!position) {
-      if (existing) existing.remove();
-      return;
-    }
-
-    const sourceLabel = location.source === 'ip' ? 'APPROX.' : 'LIVE';
-    const place = location.city || `${location.lat.toFixed(3)}, ${location.lon.toFixed(3)}`;
-    const active = location.fix > 0 ? ' map-pin--active' : '';
-    const html = `
-      <span class="map-pin map-pin--live${active}" data-source="${escapeHtml(location.source || 'none')}" style="--x:${position.x.toFixed(1)}%;--y:${position.y.toFixed(1)}%" role="img"
-        aria-label="Live Orion X location, ${escapeHtml(place)}, ${sourceLabel === 'LIVE' ? 'live location' : 'approximate city location'}">
-        <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>
-        <span class="map-pin-label">${sourceLabel === 'LIVE' ? 'ORION X · LIVE' : 'ORION X · APPROX.'}</span>
-      </span>
-    `;
-
-    if (existing) {
-      existing.outerHTML = html;
+    if (orionLiveMarkers[containerId]) {
+      orionLiveMarkers[containerId].setLatLng(latlng);
     } else {
-      const pins = container.querySelector('.map-pins');
-      if (pins) pins.insertAdjacentHTML('beforeend', html);
+      const orionIcon = L.divIcon({
+        html: `
+          <div class="map-pin map-pin--live map-pin--active" style="position:relative;left:0;top:0;transform:none;">
+            <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>
+            <span class="map-pin-label" style="opacity:1;background:#ef4444;color:#fff;font-weight:700;">ORION X · LIVE</span>
+          </div>
+        `,
+        className: 'leaflet-orion-live-icon',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      const liveMarker = L.marker(latlng, { icon: orionIcon, zIndexOffset: 1000 }).addTo(map);
+      liveMarker.bindPopup(`
+        <div style="font-family:inherit;font-size:12px;color:#111;">
+          <strong style="color:#ef4444;font-size:13px;">Orion X Live Hardware</strong><br>
+          <span>Real-time GPS / Geolocation</span><br>
+          <span>Coordinates: ${location.lat.toFixed(4)}, ${location.lon.toFixed(4)}</span>
+        </div>
+      `);
+      orionLiveMarkers[containerId] = liveMarker;
     }
   });
 }
