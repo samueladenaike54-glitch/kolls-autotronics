@@ -89,6 +89,17 @@ kolls-autotronics/
 │   ├── fleet.css
 │   ├── fleet.js
 │   └── logo.svg
+├── hardware/
+│   └── enclosure/          # Orion X 3D-printable custom OBD2 enclosure
+│       ├── OrionX_Enclosure_Final.FCStd  # Master FreeCAD 1.0 CAD model
+│       ├── build_orion_x_final.py        # Parametric CAD generator script
+│       ├── REBUILD.bat                   # 1-click STL rebuild script
+│       ├── README.md                     # Print settings, tolerances & BOM
+│       ├── STL/                          # Production 3D-printable STLs
+│       │   ├── Bottom_Shell.stl
+│       │   ├── Top_Lid.stl
+│       │   └── Battery_Cover.stl
+│       └── images/                       # CAD renders
 ├── ESP32_Vehicle_Prototype/
 │   ├── ESP32_Vehicle_Prototype.ino  # Arduino firmware
 │   └── README.md           # Hardware wiring guide

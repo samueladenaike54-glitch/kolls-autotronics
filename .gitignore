@@ -23,3 +23,8 @@ secrets.h
 j.pdf
 
 .opencode/
+
+# CAD & Python artifacts
+*.FCBak
+__pycache__/
+*.pyc
